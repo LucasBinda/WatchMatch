@@ -73,10 +73,27 @@ frontend ──POST /api/recommend {texto, filtros}──▶ gateway ──▶ r
   4. catalog-service /discover (BR + plataformas) → ~30–40 candidatos reais
      (+ recomendações por similaridade quando há "parecido com X")
   5. llm-service /rerank: recebe SÓ os candidatos (id, título, sinopse) →
-     escolhe os ~8 melhores + justificativa curta de cada
-  6. Grounding: descarta qualquer id que não esteja entre os candidatos
+     escolhe os títulos da página (12, 24, 36 ou 48) + justificativa curta de cada
+  6. Grounding: descarta qualquer id que não esteja entre os candidatos; o que faltar
+     para encher a página vem na ordem do catálogo
   7. Resposta: critérios interpretados + cards (pôster, ano, duração, onde assistir, motivo)
 ```
+
+**Tamanho da página.** Só múltiplos de 12 (`limit` ∈ 12, 24, 36, 48): a grade tem 2, 3 ou 4 colunas
+conforme a tela, e 12 divide por todas, então a última linha sempre fecha. Quando há mais resultados, a
+página vem com exatamente `limit` títulos.
+
+**Modos da IA (`aiMode`).**
+
+| Modo | Passos | Custo no Groq |
+| ---- | ------ | ------------- |
+| `pick` (padrão) | 1–7: a IA entende, escolhe e justifica | 2 chamadas; o /rerank cresce com a página |
+| `filters` | 1–4 e 7: a IA só entende; ordem do catálogo, sem `reason` | 1 chamada pequena |
+
+No modo `pick`, a IA recebe a página + 12 candidatos de folga (de 30 a 60). Quanto mais candidatos,
+mais curtas ficam as sinopses enviadas (de 300 a 150 caracteres) e as justificativas pedidas (de 150 a
+80). Assim um pedido de 48 cabe nos 8k tokens/min do Groq gratuito. Mesmo assim, duas buscas de 48
+seguidas podem estourar o limite; nesse caso a segunda cai na degradação controlada abaixo.
 
 O passo 6 é a mitigação de alucinação e prompt injection descrita em [IA_RESPONSAVEL.md](./IA_RESPONSAVEL.md): o LLM nunca cria títulos, só escolhe entre itens reais do catálogo.
 
