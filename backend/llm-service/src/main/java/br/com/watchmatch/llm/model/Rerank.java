@@ -18,7 +18,7 @@ public final class Rerank {
             @Size(max = 500) String text,
             @Size(max = 120) String summary,
             @NotEmpty @Size(max = 60) List<@Valid Candidate> candidates,
-            @Min(1) @Max(20) Integer limit) {
+            @Min(1) @Max(48) Integer limit) {
     }
 
     public record Candidate(

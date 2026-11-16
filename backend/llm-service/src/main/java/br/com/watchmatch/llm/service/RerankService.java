@@ -23,9 +23,9 @@ import br.com.watchmatch.llm.model.Rerank.Pick;
 @Service
 public class RerankService {
 
-    static final String PROMPT_VERSION = "rerank.v1";
+    static final String PROMPT_VERSION = "rerank.v2";
 
-    private static final int DEFAULT_LIMIT = 10;
+    private static final int DEFAULT_LIMIT = 12;
     private static final int MAX_REASON = 200;
 
     private final GroqClient groq;
@@ -69,10 +69,18 @@ public class RerankService {
     private String userMessage(Rerank.Request request, int limit) {
         String summary = request.summary() == null || request.summary().isBlank()
                 ? "" : "Resumo do pedido: " + request.summary() + "\n\n";
-        return "Escolha no máximo " + limit + " títulos.\n\n"
+        return "Escolha " + limit + " títulos. Justificativa de até " + reasonLength(limit) + " caracteres.\n\n"
                 + summary
                 + Prompts.userBlock(request.text())
                 + "\n\nCandidatos (JSON):\n" + Prompts.JSON.writeValueAsString(request.candidates());
+    }
+
+    // Mais títulos = justificativas mais curtas, para a resposta caber no limite de tokens do Groq gratuito
+    static int reasonLength(int limit) {
+        if (limit <= 12) {
+            return 150;
+        }
+        return limit <= 24 ? 110 : 80;
     }
 
     private Map<String, Object> schema(List<Candidate> candidates) {
