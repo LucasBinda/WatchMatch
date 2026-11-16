@@ -43,3 +43,5 @@ replay_pid*
 
 # Lixeira local (não versionar)
 trash/
+
+.claude/
