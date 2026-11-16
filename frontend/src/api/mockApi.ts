@@ -31,7 +31,8 @@ export function recommend(request: RecommendRequest): Promise<RecommendResponse>
   const filters = request.filters ?? {}
   const wanted = new Set(request.providers)
   const page = request.page ?? 1
-  const limit = request.limit ?? 10
+  const limit = request.limit ?? 12
+  const withReasons = (request.aiMode ?? 'pick') === 'pick'
 
   const matches = titles
     .filter((t) => t.watch.providers.some((p) => wanted.has(p.id)))
@@ -43,7 +44,8 @@ export function recommend(request: RecommendRequest): Promise<RecommendResponse>
     .slice((page - 1) * limit, page * limit)
     .map((t) => {
       const providers = t.watch.providers.filter((p) => wanted.has(p.id))
-      return { ...t, watch: { ...t.watch, providers }, reason: exampleReason(t, providers[0].name) }
+      const reason = withReasons ? exampleReason(t, providers[0].name) : null
+      return { ...t, watch: { ...t.watch, providers }, reason }
     })
 
   const sources: Record<string, 'filter'> = {}

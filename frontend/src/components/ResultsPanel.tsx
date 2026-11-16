@@ -3,7 +3,8 @@ import type { ReactNode } from 'react'
 import { CriteriaChips } from './CriteriaChips'
 import { TitleCard } from './TitleCard'
 import { criteriaChips } from '../lib/format'
-import type { Meta, Recommendation, RecommendResponse } from '../types'
+import { PAGE_SIZES } from '../lib/searchForm'
+import type { Meta, PageSize, Recommendation, RecommendResponse } from '../types'
 
 const EXAMPLES = [
   'Comédia leve para ver em casal, até 2 horas',
@@ -17,25 +18,41 @@ interface Props {
   loading: boolean
   loadingMore: boolean
   error: string | null
+  pageSize: PageSize
+  onPageSize: (size: PageSize) => void
   onLoadMore: () => void
   onExample: (query: string) => void
   onOpen: (title: Recommendation) => void
 }
 
-export function ResultsPanel({ meta, result, loading, loadingMore, error, onLoadMore, onExample, onOpen }: Props) {
+export function ResultsPanel({
+  meta,
+  result,
+  loading,
+  loadingMore,
+  error,
+  pageSize,
+  onPageSize,
+  onLoadMore,
+  onExample,
+  onOpen,
+}: Props) {
   const count = result?.items.length ?? 0
 
   return (
     <section aria-live="polite">
-      <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="text-xl font-semibold sm:text-2xl">Sugestões</h2>
-        <p className="text-sm text-muted">
-          {loading
-            ? 'Procurando títulos…'
-            : result
-              ? `${count} ${count === 1 ? 'título' : 'títulos'} nas suas plataformas`
-              : null}
-        </p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-xl font-semibold sm:text-2xl">Sugestões</h2>
+          <p className="text-sm text-muted">
+            {loading
+              ? 'Procurando títulos…'
+              : result
+                ? `${count} ${count === 1 ? 'título' : 'títulos'} nas suas plataformas`
+                : null}
+          </p>
+        </div>
+        <PageSizePicker value={pageSize} disabled={loading || loadingMore} onChange={onPageSize} />
       </div>
 
       {result && !loading && (
@@ -56,7 +73,7 @@ export function ResultsPanel({ meta, result, loading, loadingMore, error, onLoad
 
       {loading ? (
         <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => (
+          {Array.from({ length: 4 }, (_, i) => (
             <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-line">
               <div className="aspect-[2/3] bg-surface-2" />
               <div className="space-y-2 p-4">
@@ -115,6 +132,39 @@ export function ResultsPanel({ meta, result, loading, loadingMore, error, onLoad
         </div>
       ) : null}
     </section>
+  )
+}
+
+// "Mostrar 12 · 24 · 36 · 48": só múltiplos de 12, que fecham as linhas de 2, 3 ou 4 colunas
+function PageSizePicker({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: PageSize
+  disabled: boolean
+  onChange: (size: PageSize) => void
+}) {
+  return (
+    <div role="group" aria-label="Títulos por página" className="flex items-center gap-2 text-sm text-muted">
+      <span>Mostrar</span>
+      <div className="flex rounded-xl border border-line bg-surface-2 p-0.5">
+        {PAGE_SIZES.map((size) => (
+          <button
+            key={size}
+            type="button"
+            aria-pressed={size === value}
+            disabled={disabled}
+            onClick={() => size !== value && onChange(size)}
+            className={`min-w-10 rounded-lg px-2.5 py-1 font-medium tabular-nums transition disabled:cursor-wait ${
+              size === value ? 'bg-brand text-page' : 'hover:text-ink'
+            }`}
+          >
+            {size}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

@@ -3,32 +3,13 @@ import { useEffect, useState } from 'react'
 import { getMeta, recommend } from './api/client'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
+import { MockBanner } from './components/MockBanner'
 import { ResultsPanel } from './components/ResultsPanel'
 import { SearchModal } from './components/SearchModal'
 import { TitleDetails } from './components/TitleDetails'
+import { loadAiMode, loadPageSize, loadProviders, saveAiMode, savePageSize, saveProviders } from './lib/preferences'
 import { applyAiCriteria, userFilters, type SearchForm } from './lib/searchForm'
-import type { Meta, Recommendation, RecommendRequest, RecommendResponse } from './types'
-
-const PROVIDERS_KEY = 'watchmatch.providers'
-const DEFAULT_PROVIDERS = [8, 119] // Netflix e Prime Video
-const PAGE_SIZE = 12
-
-// try/catch: o localStorage pode estar bloqueado (modo anônimo)
-function loadProviders(): number[] {
-  try {
-    const saved = JSON.parse(localStorage.getItem(PROVIDERS_KEY) ?? 'null')
-    return Array.isArray(saved) ? saved : DEFAULT_PROVIDERS
-  } catch {
-    return DEFAULT_PROVIDERS
-  }
-}
-
-function saveProviders(providers: number[]) {
-  try {
-    localStorage.setItem(PROVIDERS_KEY, JSON.stringify(providers))
-  } catch {
-  }
-}
+import type { Meta, PageSize, Recommendation, RecommendRequest, RecommendResponse } from './types'
 
 export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null)
@@ -38,8 +19,10 @@ export default function App() {
     runtimeMax: '',
     mediaType: '',
     providers: loadProviders(),
+    aiMode: loadAiMode(),
     aiFields: [],
   })
+  const [pageSize, setPageSize] = useState<PageSize>(loadPageSize)
   const [result, setResult] = useState<RecommendResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -56,16 +39,21 @@ export default function App() {
   }, [])
 
   useEffect(() => saveProviders(form.providers), [form.providers])
+  useEffect(() => saveAiMode(form.aiMode), [form.aiMode])
 
-  async function search(current: SearchForm) {
-    setLoading(true)
-    setError(null)
-    const request: RecommendRequest = {
+  function search(current: SearchForm) {
+    return run({
       query: current.query.trim() || undefined,
       filters: userFilters(current),
       providers: current.providers,
-      limit: PAGE_SIZE,
-    }
+      limit: pageSize,
+      aiMode: current.aiMode,
+    })
+  }
+
+  async function run(request: RecommendRequest) {
+    setLoading(true)
+    setError(null)
     try {
       const response = await recommend(request)
       setResult(response)
@@ -97,6 +85,13 @@ export default function App() {
     }
   }
 
+  // Trocar o tamanho refaz a última busca do começo, como nas lojas e streamings
+  function changePageSize(size: PageSize) {
+    setPageSize(size)
+    savePageSize(size)
+    if (lastRequest) run({ ...lastRequest, limit: size, page: undefined })
+  }
+
   function submitSearch() {
     setSearchOpen(false)
     search(form)
@@ -110,6 +105,7 @@ export default function App() {
 
   return (
     <div className="min-h-dvh">
+      <MockBanner />
       <Header />
 
       <main id="descobrir" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
@@ -141,6 +137,8 @@ export default function App() {
                 loading={loading}
                 loadingMore={loadingMore}
                 error={error}
+                pageSize={pageSize}
+                onPageSize={changePageSize}
                 onLoadMore={loadMore}
                 onExample={searchExample}
                 onOpen={setSelected}

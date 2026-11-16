@@ -38,12 +38,19 @@ export interface Meta {
   providers: Provider[]
 }
 
+// Múltiplos de 12: a grade tem 2, 3 ou 4 colunas e a última linha sempre fecha
+export type PageSize = 12 | 24 | 36 | 48
+
+// pick: a IA escolhe e justifica os títulos · filters: a IA só monta os filtros, ordem do catálogo
+export type AiMode = 'pick' | 'filters'
+
 export interface RecommendRequest {
   query?: string
   filters?: Criteria
   providers: number[]
-  limit?: number
+  limit?: PageSize
   page?: number
+  aiMode?: AiMode
 }
 
 export interface AppliedCriteria extends Criteria {

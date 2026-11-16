@@ -2,7 +2,7 @@ import { ArrowRight, LoaderCircle } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
 import { PlatformPicker } from './PlatformPicker'
 import { SelectField } from './SelectField'
-import { MEDIA_OPTIONS, genresFor, runtimeOptions, setField, type SearchForm } from '../lib/searchForm'
+import { AI_MODE_OPTIONS, MEDIA_OPTIONS, genresFor, runtimeOptions, setField, type SearchForm } from '../lib/searchForm'
 import type { Meta } from '../types'
 
 const MAX_QUERY = 500
@@ -90,6 +90,31 @@ export function SearchFields({ meta, form, onChange, wide = false, autoFocus = f
           options={MEDIA_OPTIONS}
         />
       </div>
+
+      <fieldset>
+        <legend className="mb-2 text-sm text-ink/90">Como a IA ajuda</legend>
+        <div className={`grid gap-2 ${wide ? 'sm:grid-cols-2' : ''}`}>
+          {AI_MODE_OPTIONS.map((option) => {
+            const isOn = form.aiMode === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={isOn}
+                onClick={() => set('aiMode', option.value)}
+                className={`rounded-xl border px-3 py-2 text-left transition ${
+                  isOn
+                    ? 'border-brand bg-brand/15 text-ink'
+                    : 'border-line bg-surface-2 text-muted hover:border-faint hover:text-ink'
+                }`}
+              >
+                <span className="block text-sm font-medium">{option.label}</span>
+                <span className="block text-xs text-muted">{option.hint}</span>
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
 
       <PlatformPicker
         providers={meta.providers}

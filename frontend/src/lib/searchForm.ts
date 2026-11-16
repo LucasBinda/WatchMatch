@@ -1,5 +1,5 @@
 import { formatRuntime } from './format'
-import type { AppliedCriteria, Criteria, MediaType, Meta } from '../types'
+import type { AiMode, AppliedCriteria, Criteria, MediaType, Meta, PageSize } from '../types'
 
 export type FilterField = 'genre' | 'runtimeMax' | 'mediaType'
 
@@ -9,6 +9,7 @@ export interface SearchForm {
   runtimeMax: string // minutos ou ''
   mediaType: string // 'movie' | 'tv' | ''
   providers: number[]
+  aiMode: AiMode
   // Campos que a IA preencheu na última busca. Não vão como filtro do usuário:
   // na próxima busca a IA decide de novo. Mexeu no campo, ele vira seu.
   aiFields: FilterField[]
@@ -19,6 +20,13 @@ export const RUNTIME_OPTIONS = [
   { value: '90', label: 'Até 1h30' },
   { value: '120', label: 'Até 2 horas' },
   { value: '150', label: 'Até 2h30' },
+]
+
+export const PAGE_SIZES: PageSize[] = [12, 24, 36, 48]
+
+export const AI_MODE_OPTIONS: { value: AiMode; label: string; hint: string }[] = [
+  { value: 'pick', label: 'Escolhe e explica', hint: 'A IA escolhe os títulos e diz por que cada um combina' },
+  { value: 'filters', label: 'Só monta os filtros', hint: 'A IA traduz o pedido em filtros; mais rápido, sem justificativa' },
 ]
 
 export const MEDIA_OPTIONS = [
@@ -42,7 +50,7 @@ export function genresFor(mediaType: string, meta: Meta) {
   return mediaType === 'tv' ? meta.genres.tv : meta.genres.movie
 }
 
-// Mantém as plataformas: elas são do usuário, não da busca
+// Mantém as plataformas e o modo da IA: são preferências do usuário, não da busca
 export function clearSearch(form: SearchForm): SearchForm {
   return { ...form, query: '', genre: '', runtimeMax: '', mediaType: '', aiFields: [] }
 }
