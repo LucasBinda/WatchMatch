@@ -30,7 +30,7 @@ public class TitleService {
         return mapper.toDetail(client.details(type, id), type);
     }
 
-    // Busca todos ao mesmo tempo (uma thread virtual por título): 20 títulos levam o tempo de ~1
+    // Busca todos ao mesmo tempo (uma thread virtual por título): 48 títulos levam o tempo de ~1
     public List<TitleDetail> lookup(List<TitleRef> refs) {
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Future<TitleDetail>> futures = refs.stream()

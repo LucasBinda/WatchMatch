@@ -46,7 +46,7 @@ public class TitleController {
         };
     }
 
-    public record LookupBody(@NotEmpty @Size(max = 20) List<@Valid TitleRef> titles) {
+    public record LookupBody(@NotEmpty @Size(max = 48) List<@Valid TitleRef> titles) {
     }
 
     public record LookupResult(List<TitleDetail> items) {
