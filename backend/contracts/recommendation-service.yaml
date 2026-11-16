@@ -84,10 +84,19 @@ components:
             type: integer
         limit:
           type: integer
-          minimum: 1
-          maximum: 20
-          default: 10
-          description: Tamanho da página
+          enum: [12, 24, 36, 48]
+          default: 12
+          description: |
+            Tamanho da página. Só múltiplos de 12: a grade do site tem 2, 3 ou 4 colunas e a página sempre
+            fecha a última linha. Quando `hasMore` é true, a página vem com exatamente `limit` itens.
+        aiMode:
+          type: string
+          enum: [pick, filters]
+          default: pick
+          description: |
+            `pick`: a IA transforma o texto em filtros, escolhe os títulos entre os candidatos do catálogo
+            e justifica cada um (`reason`). `filters`: a IA só transforma o texto em filtros; os títulos vêm
+            na ordem do catálogo, sem `reason`. Mais rápido e gasta menos da cota do Groq.
         page:
           type: integer
           minimum: 1

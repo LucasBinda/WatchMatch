@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClientException;
 
 import br.com.watchmatch.recommendation.client.CatalogClient;
 import br.com.watchmatch.recommendation.client.LlmClient;
+import br.com.watchmatch.recommendation.model.AiMode;
 import br.com.watchmatch.recommendation.model.AppliedCriteria;
 import br.com.watchmatch.recommendation.model.Catalog.DiscoverRequest;
 import br.com.watchmatch.recommendation.model.Catalog.Meta;
@@ -38,19 +39,25 @@ import br.com.watchmatch.recommendation.model.RecommendResponse;
 import br.com.watchmatch.recommendation.model.WatchInfo;
 
 // O fluxo de docs/ARQUITETURA.md seção 4: texto → IA entende → mescla com filtros →
-// catálogo busca candidatos reais → IA escolhe e justifica → grounding → detalhes
+// catálogo busca candidatos reais → IA escolhe e justifica (modo "pick") → grounding → detalhes.
+// No modo "filters" a IA só faz o primeiro passo e a ordem é a do catálogo.
 @Service
 public class RecommendService {
 
     private static final Logger log = LoggerFactory.getLogger(RecommendService.class);
 
-    private static final int DEFAULT_LIMIT = 10;
     private static final int MAX_PAGE = 10;
-    // Quantos candidatos o catálogo traz por página e quantos vão para a IA escolher.
-    // A IA recebe menos para caber no limite de tokens por minuto do Groq gratuito.
+    // Cada chamada ao catálogo traz uma página do TMDB por tipo: até 20 de cada
     private static final int CATALOG_LIMIT = 40;
-    private static final int RERANK_CANDIDATES = 30;
-    private static final int OVERVIEW_MAX = 300;
+    private static final int TMDB_PAGE_SIZE = 20;
+    // A IA escolhe entre a página pedida e mais uma folga, até 60 candidatos (máximo do /rerank)
+    private static final int RERANK_MIN_CANDIDATES = 30;
+    private static final int RERANK_EXTRA = 12;
+    private static final int RERANK_MAX_CANDIDATES = 60;
+    // Total de caracteres de sinopse enviados à IA, dividido entre os candidatos.
+    // Mantém o pedido dentro do limite de tokens por minuto do Groq gratuito (8k) até com 48 títulos.
+    private static final int OVERVIEW_BUDGET = 9000;
+    static final int OVERVIEW_MAX = 300;
 
     static final String OFF_TOPIC = "Não entendi isso como um pedido de filme ou série; mostrando títulos populares.";
     static final String RELAXED = "Não achei nada com tudo o que entendi do pedido; mostrando resultados só com os seus filtros.";
@@ -69,8 +76,10 @@ public class RecommendService {
     }
 
     public RecommendResponse recommend(RecommendRequest request, String requestId) {
-        int limit = request.limit() != null ? request.limit() : DEFAULT_LIMIT;
-        int page = request.page() != null ? request.page() : 1;
+        int limit = request.limitOrDefault();
+        int page = request.pageOrDefault();
+        AiMode mode = request.aiModeOrDefault();
+        int needed = mode == AiMode.PICK ? rerankPool(limit) : limit;
         String text = sanitizer.clean(request.query());
         List<String> notices = new ArrayList<>();
         boolean degraded = false;
@@ -94,11 +103,11 @@ public class RecommendService {
 
         // 2. Mescla com os filtros da tela e busca candidatos reais no catálogo
         MergedCriteria merged = merger.merge(request.filters(), intent, request.providers());
-        TitleList found = discover(merged, page);
+        TitleList found = discover(merged, page, needed);
         if (isEmpty(found) && intent != null) {
             // A IA pode ter entendido critérios demais: tenta só com o que o usuário marcou
             merged = merger.merge(request.filters(), null, request.providers());
-            found = discover(merged, page);
+            found = discover(merged, page, needed);
             notices.add(RELAXED);
             summary = null;
         }
@@ -107,22 +116,19 @@ public class RecommendService {
             notices.add(NOTHING_FOUND);
         }
 
-        // 3. A IA escolhe os melhores entre os candidatos e explica o porquê
-        List<Pick> picks = null;
-        if (intent != null && !candidates.isEmpty()) {
+        // 3. Quem escolhe os títulos da página depende do modo
+        List<Pick> picks = List.of();
+        if (mode == AiMode.PICK && intent != null && !candidates.isEmpty()) {
             try {
-                RerankResponse rerank = llm.rerank(new RerankRequest(text, intent.summary(),
-                        toCandidates(candidates), limit));
-                picks = ground(rerank.picks(), candidates, limit);
+                picks = pickWithAi(text, intent, candidates, limit);
             } catch (RestClientException e) {
                 log.warn("llm-service /rerank falhou: {}", e.getMessage());
                 degraded = true;
             }
         }
-        // Sem IA (ou se ela não escolheu nada válido): a ordem do catálogo
-        if (picks == null || picks.isEmpty()) {
-            picks = candidates.stream().limit(limit).map(c -> new Pick(c.id(), c.mediaType(), null)).toList();
-        }
+        // Completa com a ordem do catálogo: no modo "filters" é a página inteira; no "pick", só o que a IA
+        // deixou faltar. Assim a página vem cheia e a grade não fica com uma linha pela metade.
+        picks = fillWithCatalogOrder(picks, candidates, limit);
 
         // 4. Detalhes (duração, classificação, onde assistir) só dos escolhidos
         List<Recommendation> items = details(picks, request.providers());
@@ -142,28 +148,72 @@ public class RecommendService {
         return new IntentRequest(text, List.copyOf(genres.values()), meta.providers());
     }
 
-    private TitleList discover(MergedCriteria merged, int page) {
+    // Quantos candidatos a IA recebe para escolher `limit` títulos: 12 → 30, 24 → 36, 36 → 48, 48 → 60
+    static int rerankPool(int limit) {
+        return Math.min(Math.max(RERANK_MIN_CANDIDATES, limit + RERANK_EXTRA), RERANK_MAX_CANDIDATES);
+    }
+
+    // Uma página nossa = `perPage` páginas seguidas do TMDB. O número só depende de `needed`
+    // (fixo enquanto o usuário clica em "Carregar mais"), então a página 2 começa onde a 1 acabou.
+    // Conta como se viesse um tipo só (20 por página): com filme e série juntos sobra candidato.
+    private TitleList discover(MergedCriteria merged, int page, int needed) {
         Criteria criteria = merged.criteria() != null ? merged.criteria() : Criteria.empty();
-        return catalog.discover(new DiscoverRequest(criteria, merged.providers(), CATALOG_LIMIT, page));
+        int perPage = Math.ceilDiv(needed, TMDB_PAGE_SIZE);
+        int first = (page - 1) * perPage + 1;
+
+        Map<String, TitleSummary> items = new LinkedHashMap<>();
+        boolean hasMore = false;
+        for (int tmdbPage = first; tmdbPage < first + perPage; tmdbPage++) {
+            TitleList list = catalog.discover(new DiscoverRequest(criteria, merged.providers(), CATALOG_LIMIT,
+                    tmdbPage));
+            if (list == null || list.items() == null) {
+                break;
+            }
+            // O mesmo título pode aparecer em duas páginas do TMDB se a popularidade mudar no meio
+            list.items().forEach(t -> items.putIfAbsent(key(t.mediaType(), t.id()), t));
+            hasMore = Boolean.TRUE.equals(list.hasMore());
+            if (!hasMore) {
+                break;
+            }
+        }
+        return new TitleList(List.copyOf(items.values()), hasMore);
+    }
+
+    // Modo "pick": a IA escolhe e justifica os títulos da página entre os candidatos reais
+    private List<Pick> pickWithAi(String text, IntentResponse intent, List<TitleSummary> candidates, int limit) {
+        List<Candidate> pool = toCandidates(candidates, rerankPool(limit));
+        RerankResponse rerank = llm.rerank(new RerankRequest(text, intent.summary(), pool, limit));
+        return ground(rerank.picks(), candidates, limit);
+    }
+
+    // Modo "filters" (ou sem IA): os primeiros do catálogo, depois de quem a IA já escolheu
+    private List<Pick> fillWithCatalogOrder(List<Pick> picks, List<TitleSummary> candidates, int limit) {
+        Set<String> used = picks.stream().map(p -> key(p.mediaType(), p.id())).collect(Collectors.toSet());
+        Stream<Pick> rest = candidates.stream()
+                .filter(c -> !used.contains(key(c.mediaType(), c.id())))
+                .map(c -> new Pick(c.id(), c.mediaType(), null));
+        return Stream.concat(picks.stream(), rest).limit(limit).toList();
     }
 
     private boolean isEmpty(TitleList list) {
         return list == null || list.items() == null || list.items().isEmpty();
     }
 
-    private List<Candidate> toCandidates(List<TitleSummary> titles) {
+    // Mais candidatos = sinopses mais curtas: 30 → 300 caracteres, 60 → 150
+    private List<Candidate> toCandidates(List<TitleSummary> titles, int pool) {
+        int overviewMax = Math.min(OVERVIEW_MAX, OVERVIEW_BUDGET / pool);
         return titles.stream()
-                .limit(RERANK_CANDIDATES)
-                .map(t -> new Candidate(t.id(), t.mediaType(), t.title(), t.year(), shorten(t.overview()),
+                .limit(pool)
+                .map(t -> new Candidate(t.id(), t.mediaType(), t.title(), t.year(), shorten(t.overview(), overviewMax),
                         t.genres() == null ? List.of() : t.genres().stream().map(Genre::name).toList()))
                 .toList();
     }
 
-    private String shorten(String text) {
-        if (text == null || text.length() <= OVERVIEW_MAX) {
+    private String shorten(String text, int max) {
+        if (text == null || text.length() <= max) {
             return text;
         }
-        return text.substring(0, OVERVIEW_MAX - 1) + "…";
+        return text.substring(0, max - 1) + "…";
     }
 
     // Grounding: só vale o que veio do catálogo. Id inventado ou repetido é descartado.

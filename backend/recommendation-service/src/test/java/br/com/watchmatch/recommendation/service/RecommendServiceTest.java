@@ -18,6 +18,7 @@ import org.springframework.web.client.ResourceAccessException;
 
 import br.com.watchmatch.recommendation.client.CatalogClient;
 import br.com.watchmatch.recommendation.client.LlmClient;
+import br.com.watchmatch.recommendation.model.AiMode;
 import br.com.watchmatch.recommendation.model.Catalog.DiscoverRequest;
 import br.com.watchmatch.recommendation.model.Catalog.Genres;
 import br.com.watchmatch.recommendation.model.Catalog.Meta;
@@ -104,7 +105,10 @@ class RecommendServiceTest {
 
         RecommendResponse resposta = service.recommend(pedido("algo bom", 5), "req-1");
 
-        assertThat(resposta.items()).extracting(Recommendation::id).containsExactly(2);
+        // Só o 2 é escolha válida da IA; o resto da página vem do catálogo, sem justificativa
+        assertThat(resposta.items()).extracting(Recommendation::id).containsExactly(2, 1, 3);
+        assertThat(resposta.items()).extracting(Recommendation::reason).containsExactly("Esse existe", null, null);
+        assertThat(resposta.items()).extracting(Recommendation::id).doesNotContain(999);
     }
 
     @Test
@@ -164,7 +168,8 @@ class RecommendServiceTest {
 
     @Test
     void paginaVaiParaOCatalogoEHasMoreVoltaDele() {
-        var pedido = new RecommendRequest(null, null, List.of(8), 2, 3);
+        // Modo "filters" com 12 por página: uma página nossa = uma página do TMDB
+        var pedido = new RecommendRequest(null, null, List.of(8), 12, 3, AiMode.FILTERS);
 
         RecommendResponse resposta = service.recommend(pedido, "req-1");
 
@@ -174,6 +179,68 @@ class RecommendServiceTest {
         assertThat(discover.getValue().providers()).containsExactly(8);
         assertThat(resposta.page()).isEqualTo(3);
         assertThat(resposta.hasMore()).isTrue();
+    }
+
+    @Test
+    void paginaGrandeJuntaVariasPaginasSeguidasDoTmdb() {
+        // 48 no modo "pick" precisa de 60 candidatos = 3 páginas do TMDB; a página 2 começa na 4
+        when(catalog.discover(any())).thenAnswer(call -> {
+            DiscoverRequest req = call.getArgument(0);
+            int base = req.page() * 100;
+            return new TitleList(java.util.stream.IntStream.range(0, 20)
+                    .mapToObj(i -> resumo(base + i, "T" + (base + i))).toList(), true);
+        });
+        when(llm.intent(any())).thenReturn(intent(Criteria.empty()));
+        when(llm.rerank(any())).thenReturn(new RerankResponse(List.of(), 0));
+
+        RecommendResponse resposta = service.recommend(
+                new RecommendRequest("algo", null, List.of(8), 48, 2, AiMode.PICK), "req-1");
+
+        var discover = ArgumentCaptor.forClass(DiscoverRequest.class);
+        verify(catalog, times(3)).discover(discover.capture());
+        assertThat(discover.getAllValues()).extracting(DiscoverRequest::page).containsExactly(4, 5, 6);
+        var rerank = ArgumentCaptor.forClass(RerankRequest.class);
+        verify(llm).rerank(rerank.capture());
+        assertThat(rerank.getValue().candidates()).hasSize(60);
+        assertThat(rerank.getValue().candidates()).allSatisfy(c ->
+                assertThat(c.overview() == null ? 0 : c.overview().length()).isLessThanOrEqualTo(150));
+        assertThat(rerank.getValue().limit()).isEqualTo(48);
+        assertThat(resposta.items()).hasSize(48);
+    }
+
+    @Test
+    void iaQueEscolheMenosQueAPaginaECompletadaPeloCatalogo() {
+        when(llm.intent(any())).thenReturn(intent(Criteria.empty()));
+        when(llm.rerank(any())).thenReturn(new RerankResponse(List.of(new Pick(3, "movie", "Ótimo")), 0));
+
+        RecommendResponse resposta = service.recommend(pedido("algo", 3), "req-1");
+
+        assertThat(resposta.items()).extracting(Recommendation::title).containsExactly("Três", "Um", "Dois");
+        assertThat(resposta.items()).extracting(Recommendation::reason).containsExactly("Ótimo", null, null);
+    }
+
+    @Test
+    void modoFiltrosUsaAIaSoParaEntenderOPedido() {
+        when(llm.intent(any())).thenReturn(intent(new Criteria(null, List.of(35), null, null, null, null, null,
+                null, null, null)));
+
+        RecommendResponse resposta = service.recommend(
+                new RecommendRequest("comédia leve", null, List.of(8), 2, 1, AiMode.FILTERS), "req-1");
+
+        verify(llm).intent(any());
+        verify(llm, never()).rerank(any());
+        assertThat(resposta.criteria().criteria().genres()).containsExactly(35);
+        assertThat(resposta.items()).extracting(Recommendation::title).containsExactly("Um", "Dois");
+        assertThat(resposta.items()).allSatisfy(item -> assertThat(item.reason()).isNull());
+        assertThat(resposta.degraded()).isFalse();
+    }
+
+    @Test
+    void candidatosDaIaCrescemComAPagina() {
+        assertThat(RecommendService.rerankPool(12)).isEqualTo(30);
+        assertThat(RecommendService.rerankPool(24)).isEqualTo(36);
+        assertThat(RecommendService.rerankPool(36)).isEqualTo(48);
+        assertThat(RecommendService.rerankPool(48)).isEqualTo(60);
     }
 
     @Test
@@ -191,7 +258,7 @@ class RecommendServiceTest {
     }
 
     private static RecommendRequest pedido(String texto, int limit) {
-        return new RecommendRequest(texto, null, List.of(8), limit, 1);
+        return new RecommendRequest(texto, null, List.of(8), limit, 1, null);
     }
 
     private static IntentResponse intent(Criteria criteria) {

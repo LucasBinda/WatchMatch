@@ -17,14 +17,14 @@ public class ClientsConfig {
 
     @Bean
     CatalogClient catalogClient(@Value("${catalog.url}") String url) {
-        // O lookup busca até 20 títulos no TMDB, por isso a espera é maior que o normal
+        // O lookup busca até 48 títulos no TMDB (em paralelo), por isso a espera é maior que o normal
         return new CatalogClient(client(url, Duration.ofSeconds(15)));
     }
 
     @Bean
     LlmClient llmClient(@Value("${llm.url}") String url) {
-        // A IA pode demorar alguns segundos para escolher entre 30 títulos
-        return new LlmClient(client(url, Duration.ofSeconds(25)));
+        // Com 48 títulos a IA escreve 48 justificativas: pode levar mais de 20 segundos
+        return new LlmClient(client(url, Duration.ofSeconds(40)));
     }
 
     private RestClient client(String baseUrl, Duration readTimeout) {

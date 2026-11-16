@@ -15,7 +15,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.web.client.ResourceAccessException;
 
+import br.com.watchmatch.recommendation.model.AiMode;
 import br.com.watchmatch.recommendation.model.AppliedCriteria;
+import br.com.watchmatch.recommendation.model.RecommendRequest;
 import br.com.watchmatch.recommendation.model.Criteria;
 import br.com.watchmatch.recommendation.model.Recommendation;
 import br.com.watchmatch.recommendation.model.RecommendResponse;
@@ -69,6 +71,45 @@ class RecommendControllerTest {
         assertThat(resposta).bodyJson().extractingPath("$.items[0].mediaType").isEqualTo("movie");
         assertThat(resposta).bodyJson().doesNotHavePath("$.items[0].reason");
         assertThat(resposta).bodyJson().doesNotHavePath("$.criteria.mediaType");
+    }
+
+    @Test
+    void tamanhoDePaginaForaDaListaDevolve400() {
+        var resposta = mvc.post().uri("/recommend")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"providers\": [8], \"limit\": 20}")
+                .exchange();
+
+        assertThat(resposta).hasStatus(400);
+        assertThat(resposta).hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+    }
+
+    @Test
+    void modoDaIaETamanhoChegamAoServico() {
+        var criterios = new AppliedCriteria(Criteria.empty(), List.of(8), null, null, Map.of());
+        when(service.recommend(any(), any()))
+                .thenReturn(new RecommendResponse("req-1", 1, false, criterios, List.of(), false, List.of()));
+
+        var resposta = mvc.post().uri("/recommend")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"providers\": [8], \"limit\": 48, \"aiMode\": \"filters\"}")
+                .exchange();
+
+        assertThat(resposta).hasStatusOk();
+        var pedido = org.mockito.ArgumentCaptor.forClass(RecommendRequest.class);
+        org.mockito.Mockito.verify(service).recommend(pedido.capture(), any());
+        assertThat(pedido.getValue().limit()).isEqualTo(48);
+        assertThat(pedido.getValue().aiMode()).isEqualTo(AiMode.FILTERS);
+    }
+
+    @Test
+    void modoDaIaDesconhecidoDevolve400() {
+        var resposta = mvc.post().uri("/recommend")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"providers\": [8], \"aiMode\": \"tudo\"}")
+                .exchange();
+
+        assertThat(resposta).hasStatus(400);
     }
 
     @Test
