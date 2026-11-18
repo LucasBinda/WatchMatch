@@ -128,9 +128,9 @@ backend/
   feedback-service/          (C3)
   contracts/                 OpenAPI de cada serviço
   eval/                      casos e script de eval (chama o gateway via HTTP)
-  docker-compose.yml         sobe tudo com `docker compose up`
   .env.example               GROQ_API_KEY, TMDB_API_KEY
-frontend/
+frontend/                    Dockerfile + nginx.conf (serve o site e repassa /api)
+docker-compose.yml           sobe tudo com `docker compose up --build` (docs/COMO_RODAR.md)
 docs/
   ARQUITETURA.md · EVAL.md
   prompts/                   registro do uso de IA no desenvolvimento (exigido pelo edital)

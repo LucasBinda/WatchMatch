@@ -44,6 +44,15 @@ Sem cadastro: as plataformas escolhidas ficam salvas só no navegador. A IA nunc
 
 > Catálogos oficiais da Netflix/Prime **não** serão baixados nem scrapados (ToS / direitos). Usamos fontes de metadados e “onde assistir” legítimas.
 
+## Como rodar
+
+```bash
+cp backend/.env.example backend/.env   # preencha as chaves do TMDB e do Groq
+docker compose up --build              # http://localhost:8080
+```
+
+Links das chaves, como subir cada parte separada e como rodar os testes: **[docs/COMO_RODAR.md](docs/COMO_RODAR.md)**.
+
 ## Estrutura do repositório
 
 ```
