@@ -1,0 +1,49 @@
+# Sobe o WatchMatch inteiro: docker compose up --build  →  http://localhost:8080
+# Cada serviço roda no seu container; só o frontend tem porta aberta para fora.
+# As chaves vêm de backend/.env (copie de backend/.env.example).
+#
+# build.network: host — o build baixa Maven e npm usando a rede do computador. Na rede padrão do build,
+# o Docker copia o DNS do computador; se ele só tiver servidores IPv6 (comum em provedores brasileiros),
+# o build não resolve nomes e o ./mvnw falha com "wget: Failed to fetch".
+
+services:
+  catalog-service:
+    build:
+      context: ./backend/catalog-service
+      network: host
+    env_file:
+      - path: ./backend/.env
+        required: false
+    restart: unless-stopped
+
+  llm-service:
+    build:
+      context: ./backend/llm-service
+      network: host
+    env_file:
+      - path: ./backend/.env
+        required: false
+    restart: unless-stopped
+
+  recommendation-service:
+    build:
+      context: ./backend/recommendation-service
+      network: host
+    environment:
+      CATALOG_URL: http://catalog-service:8081
+      LLM_URL: http://llm-service:8083
+    depends_on:
+      - catalog-service
+      - llm-service
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      network: host
+    ports:
+      - "8080:80"
+    depends_on:
+      - catalog-service
+      - recommendation-service
+    restart: unless-stopped
