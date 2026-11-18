@@ -51,7 +51,7 @@ Cada desenvolvedor **pode escolher outra linguagem** para o serviço que impleme
 | ---- | ----- |
 | Entrega | `Dockerfile` na pasta do serviço; build com a ferramenta da linguagem dentro do container |
 | Configuração | Somente por variáveis de ambiente (`PORT`, `GROQ_API_KEY`, `CATALOG_URL`…), nunca fixa no código |
-| Saúde | `GET /health` → `200` quando o serviço está de pé |
+| Saúde | `GET /health` → `200` `{"status": "ok"}` quando o serviço está de pé. O `docker-compose.yml` usa essa rota nos healthchecks e só sobe quem depende do serviço depois que ele responde |
 | Rastreamento | Recebe e repassa o cabeçalho `X-Request-Id` em toda chamada |
 | Erros | `application/problem+json`: `{ "status", "title", "detail" }` |
 | Logs | JSON na saída padrão, incluindo `requestId` |

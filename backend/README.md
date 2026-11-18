@@ -25,7 +25,6 @@ e os títulos vêm na ordem do catálogo.
 ## Ainda falta
 
 - `gateway/` (Nginx) com rate limit; por enquanto o Nginx do container do frontend faz só o roteamento de `/api`;
-- `GET /health` nos serviços (e healthchecks no `docker-compose.yml`);
 - circuit breaker (Resilience4j) no recommendation-service; hoje há só timeout;
 - no catalog: `keywords`, `originalLanguage` e `runtimeMin` ainda não viram filtros no TMDB, e `/search` e `/similar`
   (para "parecido com X") não existem.

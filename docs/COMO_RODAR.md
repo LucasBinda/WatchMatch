@@ -28,6 +28,8 @@ O primeiro build baixa as dependências do Maven e do npm e demora alguns minuto
 | Ação | Comando |
 | ---- | ------- |
 | Subir em segundo plano | `docker compose up --build -d` |
+| Subir e esperar tudo ficar pronto | `docker compose up --build -d --wait` |
+| Ver se cada serviço está saudável | `docker compose ps` (coluna STATUS mostra `healthy`) |
 | Ver os logs (todos / um) | `docker compose logs -f` · `docker compose logs -f llm-service` |
 | Reconstruir um serviço depois de mudar o código | `docker compose up --build -d catalog-service` |
 | Parar tudo | `docker compose down` |

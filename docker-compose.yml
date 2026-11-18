@@ -6,6 +6,15 @@
 # o Docker copia o DNS do computador; se ele só tiver servidores IPv6 (comum em provedores brasileiros),
 # o build não resolve nomes e o ./mvnw falha com "wget: Failed to fetch".
 
+# Cada serviço Java responde GET /health quando está de pé; o Compose só sobe quem depende dele depois disso.
+# O Spring leva alguns segundos para iniciar: start_period dá esse tempo sem contar como falha.
+x-health-timing: &health-timing
+  interval: 10s
+  timeout: 3s
+  retries: 3
+  start_period: 40s
+  start_interval: 2s
+
 services:
   catalog-service:
     build:
@@ -14,6 +23,9 @@ services:
     env_file:
       - path: ./backend/.env
         required: false
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/health"]
+      <<: *health-timing
     restart: unless-stopped
 
   llm-service:
@@ -23,6 +35,9 @@ services:
     env_file:
       - path: ./backend/.env
         required: false
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/health"]
+      <<: *health-timing
     restart: unless-stopped
 
   recommendation-service:
@@ -33,8 +48,13 @@ services:
       CATALOG_URL: http://catalog-service:8081
       LLM_URL: http://llm-service:8083
     depends_on:
-      - catalog-service
-      - llm-service
+      catalog-service:
+        condition: service_healthy
+      llm-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8082/health"]
+      <<: *health-timing
     restart: unless-stopped
 
   frontend:
@@ -44,6 +64,12 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - catalog-service
-      - recommendation-service
+      catalog-service:
+        condition: service_healthy
+      recommendation-service:
+        condition: service_healthy
+    # O Nginx da imagem alpine tem wget (busybox), não curl. 127.0.0.1: o nginx.conf só escuta IPv4
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      <<: *health-timing
     restart: unless-stopped
