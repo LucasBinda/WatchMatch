@@ -8,7 +8,8 @@ As três APIs citadas no relatório estão no ar e exigem chave. Teste sem chave
 | Groq | `GET https://api.groq.com/openai/v1/models` | `401 Invalid API Key` |
 | Watchmode | `GET https://api.watchmode.com/v1/sources/` | `401 Please enter a valid API key` |
 
-**Ainda falta:** criar as chaves (todas gratuitas) e repetir o teste com elas, principalmente para confirmar a cobertura de plataformas no **BR**.
+**Atualização (17/11/2026):** com as chaves do TMDB e do Groq, o site completo rodou no Docker e trouxe títulos
+com plataformas do **BR** (Netflix, Prime Video). A chave do Watchmode não foi criada: ele ficou como extra do C3.
 
 ---
 

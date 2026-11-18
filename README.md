@@ -9,14 +9,6 @@ Projeto da disciplina **Projeto Integrador IV (2026/2)** — FAESA · IA + Teste
 - Lucas Binda
 - Felipe Koscky
 
-## Entrega 1 (C1) — status
-
-Relatório com escopo, justificativa, metodologia, plano de trabalho e comunidade impactada:
-
-- **[docs/RELATORIO_C1.md](docs/RELATORIO_C1.md)** — relatório completo da Entrega 1
-- [docs/PLANO_TRABALHO.md](docs/PLANO_TRABALHO.md) — cronograma C1→C3
-- [docs/IA_RESPONSAVEL.md](docs/IA_RESPONSAVEL.md) — privacidade, segurança e governança (inicial)
-- [docs/ARQUITETURA.md](docs/ARQUITETURA.md) — stack, arquitetura, estrutura de pastas, telas e plano do C2
 
 ## Ideia em uma frase
 
@@ -32,15 +24,19 @@ Você também escolhe **como a IA ajuda**: ela pode escolher os títulos e expli
 
 Sem cadastro: as plataformas escolhidas ficam salvas só no navegador. A IA nunca inventa títulos, ela só escolhe entre itens reais do catálogo.
 
-## Stack prevista
+## Stack
 
-| Camada | Tecnologia (prevista) |
-| ------ | --------------------- |
-| Frontend | Web (React / Next.js) — mobile via navegador; app nativo como extra |
-| Backend | Node.js ou Python |
-| IA | GroqCloud (LLM) + prompts / saída estruturada; RAG se necessário |
-| Dados | TMDB (metadados) + API de disponibilidade (ex.: Watchmode) |
-| Deploy | Render ou Railway (C3) |
+| Camada | Tecnologia |
+| ------ | ---------- |
+| Frontend | React 19 + TypeScript + Vite + Tailwind CSS. Funciona no navegador do celular |
+| Backend | 3 microsserviços em Java 21 + Spring Boot 4 (catálogo, IA e recomendação) |
+| IA | GroqCloud (modelos `gpt-oss`) com saída em JSON estruturado e prompts versionados |
+| Dados | TMDB: metadados e "onde assistir" no Brasil (dados do JustWatch) |
+| Infra | Docker Compose; Nginx serve o site e repassa `/api` |
+| Deploy | A definir no C3 (Render, Railway ou uma VM com o Compose) |
+
+No relatório do C1 a stack era só uma previsão (Node.js ou Python, Next.js). A escolha final e os motivos
+estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 > Catálogos oficiais da Netflix/Prime **não** serão baixados nem scrapados (ToS / direitos). Usamos fontes de metadados e “onde assistir” legítimas.
 
@@ -56,9 +52,10 @@ Links das chaves, como subir cada parte separada e como rodar os testes: **[docs
 ## Estrutura do repositório
 
 ```
-frontend/   # UI web (em desenvolvimento)
-backend/    # API + integração com IA (em desenvolvimento)
-docs/       # Relatórios e documentação do projeto
+frontend/            # site em React (ver frontend/README.md)
+backend/             # microsserviços, contratos OpenAPI e .env das chaves (ver backend/README.md)
+docs/                # relatórios, arquitetura e guia de como rodar
+docker-compose.yml   # sobe tudo com um comando
 ```
 
 ## Licença

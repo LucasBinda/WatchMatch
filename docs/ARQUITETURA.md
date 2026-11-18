@@ -32,7 +32,7 @@ Princípios:
 
 ## 3. Linguagens e liberdade de escolha
 
-**Padrão:** Java 21 + Spring Boot 3 (testes com JUnit 5, Mockito e WireMock).
+**Padrão:** Java 21 + Spring Boot 4 (testes com JUnit 5, Mockito e o `MockRestServiceServer` do Spring no lugar das APIs externas).
 **Gateway:** Nginx (configuração, sem código). Pode virar Spring Cloud Gateway se precisar de lógica própria.
 
 Cada desenvolvedor **pode escolher outra linguagem** para o serviço que implementa, desde que cumpra os combinados abaixo. O serviço é uma caixa-preta: vale o que ele promete por fora.
@@ -139,7 +139,8 @@ trash/                       lixeira local, ignorada pelo git
 
 ## 7. Frontend
 
-Previsto: Vite + React + TypeScript + Tailwind (a confirmar). O frontend conhece **apenas o gateway**.
+Vite + React 19 + TypeScript + Tailwind CSS. O frontend conhece **apenas `/api`**: em desenvolvimento quem
+repassa é o proxy do Vite; no Docker, o Nginx do container do frontend (até o gateway existir).
 
 ### Telas
 
@@ -154,7 +155,7 @@ Previsto: Vite + React + TypeScript + Tailwind (a confirmar). O frontend conhece
 | Nível | Ferramenta | O que cobre |
 | ----- | ---------- | ----------- |
 | Unitário | JUnit 5 + Mockito (ou equivalente da linguagem) | sanitização, mescla de filtros, parse do LLM, grounding |
-| Integração | WireMock (Groq/TMDB simulados) | cada serviço isolado contra APIs externas falsas |
+| Integração | `MockRestServiceServer` (Groq/TMDB simulados) | cada serviço isolado contra APIs externas falsas |
 | Contrato | Schemathesis | cada serviço cumpre seu OpenAPI |
 | Ponta a ponta | Docker Compose + chamadas ao gateway | fluxo completo, incluindo fallback sem LLM |
 
