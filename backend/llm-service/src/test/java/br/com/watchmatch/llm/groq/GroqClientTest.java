@@ -5,6 +5,8 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.util.Map;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -47,5 +50,32 @@ class GroqClientTest {
         assertThat(resposta.content()).isEqualTo("{\"ok\": true}");
         assertThat(resposta.totalTokens()).isEqualTo(321);
         groqFalso.verify();
+    }
+
+    @Test
+    void respostaForaDoSchemaEAproveitadaDoFailedGeneration() {
+        groqFalso.expect(requestTo("https://api.groq.com/openai/v1/chat/completions"))
+                .andRespond(withBadRequest().contentType(MediaType.APPLICATION_JSON).body("""
+                    {"error": {"message": "Generated JSON does not match the expected schema.",
+                               "type": "invalid_request_error", "code": "json_validate_failed",
+                               "failed_generation": "{\\"picks\\": [{\\"id\\": 999}]}"}}
+                    """));
+
+        var resposta = client.complete("openai/gpt-oss-120b", "regras", "pedido", "rerank",
+                Map.of("type", "object"));
+
+        assertThat(resposta.content()).isEqualTo("{\"picks\": [{\"id\": 999}]}");
+        assertThat(resposta.totalTokens()).isNull();
+    }
+
+    @Test
+    void outroErro400ContinuaSendoErro() {
+        groqFalso.expect(requestTo("https://api.groq.com/openai/v1/chat/completions"))
+                .andRespond(withBadRequest().contentType(MediaType.APPLICATION_JSON).body("""
+                    {"error": {"message": "model not found", "code": "model_not_found"}}
+                    """));
+
+        assertThatThrownBy(() -> client.complete("x", "regras", "pedido", "rerank", Map.of("type", "object")))
+                .isInstanceOf(HttpClientErrorException.BadRequest.class);
     }
 }
