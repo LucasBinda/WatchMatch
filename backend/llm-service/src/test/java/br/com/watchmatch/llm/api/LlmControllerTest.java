@@ -32,6 +32,14 @@ class LlmControllerTest {
     private RerankService rerankService;
 
     @Test
+    void healthRespondeOk() {
+        var resposta = mvc.get().uri("/health").exchange();
+
+        assertThat(resposta).hasStatusOk();
+        assertThat(resposta).bodyJson().extractingPath("$.status").isEqualTo("ok");
+    }
+
+    @Test
     void textoVazioDevolve400() {
         var resposta = mvc.post().uri("/intent")
                 .contentType(MediaType.APPLICATION_JSON)

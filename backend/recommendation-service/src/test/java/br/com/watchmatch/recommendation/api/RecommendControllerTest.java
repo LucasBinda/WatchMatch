@@ -37,6 +37,14 @@ class RecommendControllerTest {
     private RecommendService service;
 
     @Test
+    void healthRespondeOk() {
+        var resposta = mvc.get().uri("/health").exchange();
+
+        assertThat(resposta).hasStatusOk();
+        assertThat(resposta).bodyJson().extractingPath("$.status").isEqualTo("ok");
+    }
+
+    @Test
     void semPlataformasDevolve400() {
         var resposta = mvc.post().uri("/recommend")
                 .contentType(MediaType.APPLICATION_JSON)
