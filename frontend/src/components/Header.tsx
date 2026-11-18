@@ -9,10 +9,10 @@ export function Header() {
   return (
     <header className="sticky top-0 z-30 border-b border-line/70 bg-page/80 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-10 gap-y-2 px-4 py-3 sm:px-6">
-        <a href="#descobrir" className="flex items-center gap-2" aria-label="AjudadorDePublico, início">
+        <a href="#descobrir" className="flex items-center gap-2" aria-label="WatchMatch, início">
           <Play className="size-7 fill-brand text-brand" />
           <span className="text-xl font-extrabold tracking-tight">
-            AjudadorDe<span className="text-brand-soft">Publico</span>
+            Watch<span className="text-brand-soft">Match</span>
           </span>
         </a>
 
