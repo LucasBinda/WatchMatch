@@ -32,7 +32,7 @@ Sem cadastro: as plataformas escolhidas ficam salvas só no navegador. A IA nunc
 | Backend | 3 microsserviços em Java 21 + Spring Boot 4 (catálogo, IA e recomendação) |
 | IA | GroqCloud (modelos `gpt-oss`) com saída em JSON estruturado e prompts versionados |
 | Dados | TMDB: metadados e "onde assistir" no Brasil (dados do JustWatch) |
-| Infra | Docker Compose; Nginx serve o site e repassa `/api` |
+| Infra | Docker Compose; gateway Nginx na frente de tudo, com rate limit por IP |
 | Deploy | A definir no C3 (Render, Railway ou uma VM com o Compose) |
 
 No relatório do C1 a stack era só uma previsão (Node.js ou Python, Next.js). A escolha final e os motivos

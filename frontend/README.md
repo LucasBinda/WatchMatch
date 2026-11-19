@@ -27,7 +27,7 @@ Suba os três serviços (ver `backend/README.md`) e rode:
 npm run dev:backend   # o mesmo que VITE_USE_MOCKS=false
 ```
 
-Em desenvolvimento ainda não há gateway: o Vite repassa `/api/recommend` para o recommendation-service
+Em desenvolvimento o gateway não entra (nem o rate limit): o Vite repassa `/api/recommend` para o recommendation-service
 (`localhost:8082`) e o resto de `/api` para o catalog-service (`localhost:8081`). Ver `vite.config.ts`.
 
 ## Estrutura

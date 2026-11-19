@@ -22,7 +22,9 @@ Sem a chave do Groq o site funciona sem IA: os títulos vêm na ordem do catálo
 docker compose up --build
 ```
 
-Abra <http://localhost:8080>. Cada serviço roda no seu próprio container, e só o frontend fica exposto.
+Abra <http://localhost:8080>. Cada serviço roda no seu próprio container, e só o gateway fica exposto.
+O gateway limita as buscas: 6 por minuto por IP (com folga para 4 seguidas) e 20 por minuto no site todo.
+Passou disso, o site mostra "Muitas buscas seguidas" e libera de novo em alguns segundos.
 O primeiro build baixa as dependências do Maven e do npm e demora alguns minutos; os próximos são rápidos.
 
 | Ação | Comando |
@@ -31,6 +33,7 @@ O primeiro build baixa as dependências do Maven e do npm e demora alguns minuto
 | Subir e esperar tudo ficar pronto | `docker compose up --build -d --wait` |
 | Ver se cada serviço está saudável | `docker compose ps` (coluna STATUS mostra `healthy`) |
 | Ver os logs (todos / um) | `docker compose logs -f` · `docker compose logs -f llm-service` |
+| Ver quem o rate limit barrou | `docker compose logs gateway \| grep limiting` |
 | Reconstruir um serviço depois de mudar o código | `docker compose up --build -d catalog-service` |
 | Parar tudo | `docker compose down` |
 

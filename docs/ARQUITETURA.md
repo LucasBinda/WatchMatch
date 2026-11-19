@@ -19,7 +19,7 @@ O `llm-service` **não** tem rota pública: só é acessível pela rede interna.
 
 | Serviço | Responsabilidade | Dono de | Entrega |
 | ------- | ---------------- | ------- | ------- |
-| **gateway** | Porta única do frontend: roteamento, CORS, rate limit por IP, limite de tamanho do corpo, geração do `X-Request-Id` | nada | C2 |
+| **gateway** | Porta única do site: roteamento, rate limit por IP, limite de tamanho do corpo, geração do `X-Request-Id` | nada | C2 |
 | **recommendation-service** | Orquestrador do fluxo de recomendação (seção 4) | nada (stateless) | C2 |
 | **llm-service** | Integração com o Groq: `POST /intent` e `POST /rerank`; prompts versionados; validação do JSON do LLM | chave do Groq | C2 |
 | **catalog-service** | Integração com o TMDB: discover, detalhes, onde assistir, gêneros e plataformas do BR; cache | chave do TMDB | C2 |
@@ -114,8 +114,33 @@ Rotas públicas (tudo o que não está listado é bloqueado):
 | `GET /api/meta` | catalog-service (gêneros e plataformas do BR) |
 | `POST /api/feedback` | feedback-service (C3) |
 | `GET /health` | gateway |
+| qualquer outro caminho fora de `/api` | frontend (o site) |
 
-Responsabilidades centralizadas no gateway: CORS, `limit_req` por IP (protege o free tier do Groq), limite de tamanho do corpo e `X-Request-Id` (`$request_id` do Nginx).
+Responsabilidades centralizadas no gateway: `limit_req` (protege o free tier do Groq), limite de tamanho do corpo
+(16 KB) e `X-Request-Id` (`$request_id` do Nginx). CORS não é preciso: site e API saem da mesma origem. Rotas
+internas (`/discover`, `/titles/lookup`, o llm-service) respondem 404 para fora. Configuração em
+`backend/gateway/nginx.conf`.
+
+### Rate limit
+
+Modelo **por IP + teto global**, só no `/api/recommend`, que é a rota que gasta a IA:
+
+| Zona | Chave | Limite | Folga (cliques seguidos) | Para quê |
+| ---- | ----- | ------ | ------------------------ | -------- |
+| `recommend_ip` | IP | 6 buscas/min | 4 | um usuário sozinho não esgota a cota diária de todos |
+| `recommend_all` | o site todo | 20 buscas/min | 10 | acompanha a cota por minuto do Groq, venha de quantos IPs vier |
+| `api_ip` | IP | 10 pedidos/s | 20 | `/api/meta` e detalhes, que não usam IA |
+
+Passou do limite: `429` em `application/problem+json`, com `Retry-After: 10`, e o site mostra o `detail`
+("Muitas buscas seguidas…"). Os contadores ficam na memória do Nginx e zeram quando ele reinicia.
+
+Modelos avaliados e descartados por ora: só por IP (não protege a cota com muitos usuários e barra uma sala
+inteira atrás do mesmo Wi-Fi); por custo em tokens, com Bucket4j (mais justo, mas exige código e contadores);
+cota diária por IP (exige Redis ou Postgres). No item de resiliência entra o limite **suave**: quando o Groq ou
+o limite apertam, a busca cai para o modo `filters` em vez de falhar.
+
+No deploy atrás de um proxy (Render, Railway), o Nginx precisa do `real_ip` para enxergar o IP do usuário;
+o trecho está comentado no `nginx.conf`.
 
 ## 6. Estrutura do repositório
 
@@ -129,7 +154,7 @@ backend/
   contracts/                 OpenAPI de cada serviço
   eval/                      casos e script de eval (chama o gateway via HTTP)
   .env.example               GROQ_API_KEY, TMDB_API_KEY
-frontend/                    Dockerfile + nginx.conf (serve o site e repassa /api)
+frontend/                    Dockerfile + nginx.conf (só serve o site; o gateway repassa para ele)
 docker-compose.yml           sobe tudo com `docker compose up --build` (docs/COMO_RODAR.md)
 docs/
   ARQUITETURA.md · EVAL.md
@@ -140,7 +165,7 @@ trash/                       lixeira local, ignorada pelo git
 ## 7. Frontend
 
 Vite + React 19 + TypeScript + Tailwind CSS. O frontend conhece **apenas `/api`**: em desenvolvimento quem
-repassa é o proxy do Vite; no Docker, o Nginx do container do frontend (até o gateway existir).
+repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 
 ### Telas
 
