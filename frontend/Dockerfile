@@ -8,7 +8,7 @@ COPY . .
 ENV VITE_USE_MOCKS=false
 RUN npm run build
 
-# Nginx serve o site e repassa /api para os serviços, como o proxy do Vite faz em desenvolvimento
+# Nginx só serve o site; a /api passa pelo gateway (backend/gateway)
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html

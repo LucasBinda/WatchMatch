@@ -1,5 +1,6 @@
 # Sobe o WatchMatch inteiro: docker compose up --build  →  http://localhost:8080
-# Cada serviço roda no seu container; só o frontend tem porta aberta para fora.
+# Cada serviço roda no seu container; só o gateway tem porta aberta para fora.
+# O gateway (Nginx) repassa o site ao frontend e a /api aos serviços, com rate limit por IP.
 # As chaves vêm de backend/.env (copie de backend/.env.example).
 #
 # build.network: host — o build baixa Maven e npm usando a rede do computador. Na rede padrão do build,
@@ -61,15 +62,26 @@ services:
     build:
       context: ./frontend
       network: host
+    # O Nginx da imagem alpine tem wget (busybox), não curl. 127.0.0.1: o nginx.conf só escuta IPv4
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      <<: *health-timing
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./backend/gateway
     ports:
       - "8080:80"
+    # O Nginx confere na partida se os nomes dos destinos existem: só sobe depois de todos
     depends_on:
       catalog-service:
         condition: service_healthy
       recommendation-service:
         condition: service_healthy
-    # O Nginx da imagem alpine tem wget (busybox), não curl. 127.0.0.1: o nginx.conf só escuta IPv4
+      frontend:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
       <<: *health-timing
     restart: unless-stopped
