@@ -1,13 +1,7 @@
 # WatchMatch (`notComplete`)
 
-Aplicação web de **recomendação de filmes e séries** com filtros + intenção em linguagem natural (LLM via Groq), considerando as plataformas disponíveis para o usuário (ex.: Netflix, Amazon Prime Video).
+Aplicação web de **recomendação de filmes e séries** com filtros + intenção em linguagem natural (LLM via Groq api), considerando as plataformas disponíveis para o usuário (ex.: Netflix, Amazon Prime Video).
 
-Projeto da disciplina **Projeto Integrador IV (2026/2)** — FAESA · IA + Testes de Software.
-
-## Grupo
-
-- Lucas Binda
-- Felipe Koscky
 
 
 ## Ideia em uma frase
@@ -57,6 +51,11 @@ backend/             # microsserviços, contratos OpenAPI e .env das chaves (ver
 docs/                # relatórios, arquitetura e guia de como rodar
 docker-compose.yml   # sobe tudo com um comando
 ```
+
+## Colaboradores
+
+- Lucas Binda
+- Felipe Koscky
 
 ## Licença
 
