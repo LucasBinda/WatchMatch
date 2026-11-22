@@ -25,7 +25,7 @@ import br.com.watchmatch.llm.model.Provider;
 @Service
 public class IntentService {
 
-    static final String PROMPT_VERSION = "intent.v1";
+    static final String PROMPT_VERSION = "intent.v2";
 
     private static final Set<String> CERTIFICATIONS = Set.of("L", "10", "12", "14", "16", "18");
     private static final Pattern LANGUAGE = Pattern.compile("[a-z]{2}");
@@ -62,8 +62,8 @@ public class IntentService {
                 "movie".equals(answer.mediaType()) || "tv".equals(answer.mediaType()) ? answer.mediaType() : null,
                 allowed(answer.genres(), genreIds),
                 allowed(answer.excludeGenres(), genreIds),
-                null,
-                answer.runtimeMax() != null && answer.runtimeMax() > 0 ? answer.runtimeMax() : null,
+                runtimeMin(answer),
+                positive(answer.runtimeMax()),
                 year(answer.yearFrom()),
                 year(answer.yearTo()),
                 answer.originalLanguage() != null && LANGUAGE.matcher(answer.originalLanguage()).matches()
@@ -99,6 +99,7 @@ public class IntentService {
         properties.put("mediaType", Map.of("type", "string", "enum", List.of("movie", "tv", "any")));
         properties.put("genres", arrayOf(integerOf(genreIds)));
         properties.put("excludeGenres", arrayOf(integerOf(genreIds)));
+        properties.put("runtimeMin", Map.of("type", "integer"));
         properties.put("runtimeMax", Map.of("type", "integer"));
         properties.put("yearFrom", Map.of("type", "integer"));
         properties.put("yearTo", Map.of("type", "integer"));
@@ -159,6 +160,17 @@ public class IntentService {
         return trimmed.length() > MAX_SUMMARY ? trimmed.substring(0, MAX_SUMMARY) : trimmed;
     }
 
+    private static Integer positive(Integer value) {
+        return value != null && value > 0 ? value : null;
+    }
+
+    // "Entre 3 e 2 horas" não existe: com mínimo maior que o máximo, fica só o máximo
+    private static Integer runtimeMin(Answer answer) {
+        Integer min = positive(answer.runtimeMin());
+        Integer max = positive(answer.runtimeMax());
+        return min != null && max != null && min > max ? null : min;
+    }
+
     // O JSON que a IA devolve (segue o schema acima)
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Answer(
@@ -166,6 +178,7 @@ public class IntentService {
             String mediaType,
             List<Integer> genres,
             List<Integer> excludeGenres,
+            Integer runtimeMin,
             Integer runtimeMax,
             Integer yearFrom,
             Integer yearTo,

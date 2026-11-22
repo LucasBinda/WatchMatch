@@ -56,8 +56,27 @@ class IntentServiceTest {
         assertThat(resposta.providers()).containsExactly(8);
         assertThat(resposta.summary()).isEqualTo("Comédia leve, até 2h");
         assertThat(resposta.meta().model()).isEqualTo(MODELO);
-        assertThat(resposta.meta().promptVersion()).isEqualTo("intent.v1");
+        assertThat(resposta.meta().promptVersion()).isEqualTo("intent.v2");
         assertThat(resposta.meta().totalTokens()).isEqualTo(500);
+    }
+
+    @Test
+    void duracaoMinimaEntraEMinimoMaiorQueOMaximoSai() {
+        responde("""
+            {"offTopic": false, "mediaType": "movie", "genres": [], "excludeGenres": [], "runtimeMin": 180,
+             "runtimeMax": 0, "yearFrom": 0, "yearTo": 0, "originalLanguage": "ko", "certificationMax": "",
+             "keywords": ["heist"], "providers": [], "referenceTitle": "", "summary": "Coreano de assalto, >3h"}
+            """);
+        assertThat(service.interpret(pedido).criteria().runtimeMin()).isEqualTo(180);
+
+        responde("""
+            {"offTopic": false, "mediaType": "movie", "genres": [], "excludeGenres": [], "runtimeMin": 180,
+             "runtimeMax": 120, "yearFrom": 0, "yearTo": 0, "originalLanguage": "", "certificationMax": "",
+             "keywords": [], "providers": [], "referenceTitle": "", "summary": "Confuso"}
+            """);
+        var confuso = service.interpret(pedido).criteria();
+        assertThat(confuso.runtimeMin()).isNull();
+        assertThat(confuso.runtimeMax()).isEqualTo(120);
     }
 
     @Test
