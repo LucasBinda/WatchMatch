@@ -24,5 +24,4 @@ e os títulos vêm na ordem do catálogo.
 
 ## Ainda falta
 
-- no catalog: `keywords`, `originalLanguage` e `runtimeMin` ainda não viram filtros no TMDB, e `/search` e `/similar`
-  (para "parecido com X") não existem.
+- C3: feedback-service com Postgres, eval da IA (`backend/eval/`) e deploy.

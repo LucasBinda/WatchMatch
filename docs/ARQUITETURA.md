@@ -67,17 +67,39 @@ Cada desenvolvedor **pode escolher outra linguagem** para o serviço que impleme
 ```
 frontend ──POST /api/recommend {texto, filtros}──▶ gateway ──▶ recommendation-service
   1. Valida e sanitiza o texto (máx. ~500 caracteres)
-  2. llm-service /intent: texto → JSON {tipo, gêneros, excluir_gêneros, duração_máx,
+  2. llm-service /intent: texto → JSON {tipo, gêneros, excluir_gêneros, duração_mín, duração_máx,
      anos, idioma, clima/palavras-chave, título_referência}
   3. Mescla com os filtros explícitos (filtro da UI sempre vence o LLM)
   4. catalog-service /discover (BR + plataformas) → ~30–40 candidatos reais
-     (+ recomendações por similaridade quando há "parecido com X")
+     (ou /similar quando há "parecido com X"; se nada aparece, afrouxa aos poucos)
   5. llm-service /rerank: recebe SÓ os candidatos (id, título, sinopse) →
      escolhe os títulos da página (12, 24, 36 ou 48) + justificativa curta de cada
   6. Grounding: descarta qualquer id que não esteja entre os candidatos; o que faltar
      para encher a página vem na ordem do catálogo
   7. Resposta: critérios interpretados + cards (pôster, ano, duração, onde assistir, motivo)
 ```
+
+**Critérios no TMDB.** Duração mínima e idioma original viram filtros diretos. As palavras-chave (em
+inglês, até 5) viram ids do TMDB (`/search/keyword`, com cache) e entram com **OU**: "E" entre todas quase
+sempre zera a busca nas plataformas do usuário. Palavra sem correspondência é ignorada.
+
+**"Parecido com X" (modelo híbrido, `POST /similar` do catalog-service).**
+
+1. Acha X pelo nome (`/search/multi`), em filmes e séries.
+2. Primeiro vêm as recomendações do TMDB para X que estão nas plataformas do usuário (assinatura, grátis
+   ou com anúncios) e respeitam os critérios. O TMDB não filtra recomendação por plataforma, então o
+   catálogo confere uma a uma, em paralelo (~20 consultas por página do TMDB).
+3. O resto da página vem de um discover pelos gêneros de X e até 8 palavras-chave dele.
+
+O próprio X nunca aparece. Sem tipo pedido, os resultados são do tipo de X. "Série parecida com um filme"
+usa só as palavras-chave, porque filme e série têm ids de gênero diferentes no TMDB. A referência fica em
+cache, porque "Carregar mais" pede o mesmo X de novo. Se X não existe, aparece o aviso "Não achei X no
+catálogo" e a busca segue pelo resto do pedido.
+
+**Afrouxar aos poucos.** Se os critérios zeram a busca, o recommendation-service tenta de novo sem as
+palavras-chave, depois sem idioma e duração mínima, e só então sem nenhum critério da IA. Cada passo só tira
+o que veio da IA: o que o usuário marcou na tela fica. O aviso diz o que foi deixado de lado ("deixei de
+lado: palavras-chave"). São até 3 buscas a mais no TMDB, e só quando a primeira volta vazia.
 
 **Tamanho da página.** Só múltiplos de 12 (`limit` ∈ 12, 24, 36, 48): a grade tem 2, 3 ou 4 colunas
 conforme a tela, e 12 divide por todas, então a última linha sempre fecha. Quando há mais resultados, a

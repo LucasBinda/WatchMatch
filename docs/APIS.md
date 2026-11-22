@@ -30,7 +30,7 @@ com plataformas do **BR** (Netflix, Prime Video). A chave do Watchmode não foi 
 | `GET /discover/movie` e `/discover/tv` | Busca de candidatos por critérios | catalog `/discover` |
 | `GET /search/multi` (ou `/search/movie`, `/search/tv`) | Resolver "parecido com X" | catalog `/search` |
 | `GET /movie/{id}` e `/tv/{id}` (com `append_to_response=watch/providers,credits,release_dates`) | Detalhes + onde assistir + elenco + classificação em uma chamada | catalog `/titles/...` |
-| `GET /movie/{id}/recommendations` | Títulos parecidos | catalog `/titles/.../similar` |
+| `GET /movie/{id}/recommendations` | Títulos parecidos | catalog `POST /similar` (com `/search/multi` e `/search/keyword`) |
 | `GET /genre/movie/list` e `/genre/tv/list` | Lista de gêneros | catalog `/meta` |
 | `GET /watch/providers/movie?watch_region=BR` | Plataformas disponíveis no BR | catalog `/meta` |
 | `GET /search/keyword` | Converter palavra-chave em id | catalog `/discover` |
