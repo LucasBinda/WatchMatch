@@ -58,7 +58,8 @@ export function ResultsPanel({
       {result && !loading && (
         <div className="mb-5 space-y-3">
           <CriteriaChips chips={criteriaChips(result.criteria, meta)} summary={result.criteria.summary} />
-          {result.degraded && (
+          {/* O backend explica por que a IA ficou de fora nos notices; o aviso genérico é só a reserva */}
+          {result.degraded && result.notices.length === 0 && (
             <Notice icon={CircleAlert}>A IA está indisponível agora; mostrando títulos do catálogo sem justificativa.</Notice>
           )}
           {result.notices.map((n) => (
