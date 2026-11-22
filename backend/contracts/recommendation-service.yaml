@@ -12,8 +12,9 @@ info:
     `/rerank` → grounding (descarta ids fora dos candidatos) → catalog-service
     `/titles/lookup` para enriquecer os itens finais.
 
-    Degradação: se o llm-service falhar ou estiver com o circuito aberto,
-    responde com os candidatos do catálogo sem justificativas e `degraded: true`.
+    Degradação: se o llm-service falhar, estiver com o circuito aberto ou o limite suave do /rerank
+    acabar (8 fichas/min no site; 12 títulos = 1 ficha, 48 = 4), responde com os candidatos do catálogo
+    sem justificativas, `degraded: true` e um aviso em `notices` dizendo o motivo.
 servers:
   - url: http://recommendation-service:8080
     description: Rede interna do Docker Compose
@@ -127,7 +128,9 @@ components:
           description: true quando a IA não pôde ser usada e o resultado veio só do catálogo
         notices:
           type: array
-          description: Avisos para exibir ao usuário (ex. "Não entendi o pedido; mostrando populares")
+          description: |
+            Avisos para exibir ao usuário (ex. "Não entendi o pedido; mostrando populares").
+            Com `degraded: true` sempre há um aviso dizendo por que a IA ficou de fora.
           items:
             type: string
 

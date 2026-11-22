@@ -37,6 +37,7 @@ import br.com.watchmatch.recommendation.model.Recommendation;
 import br.com.watchmatch.recommendation.model.RecommendRequest;
 import br.com.watchmatch.recommendation.model.RecommendResponse;
 import br.com.watchmatch.recommendation.model.WatchInfo;
+import br.com.watchmatch.recommendation.service.AiGuard.AiUnavailableException;
 
 // O fluxo de docs/ARQUITETURA.md seção 4: texto → IA entende → mescla com filtros →
 // catálogo busca candidatos reais → IA escolhe e justifica (modo "pick") → grounding → detalhes.
@@ -62,17 +63,26 @@ public class RecommendService {
     static final String OFF_TOPIC = "Não entendi isso como um pedido de filme ou série; mostrando títulos populares.";
     static final String RELAXED = "Não achei nada com tudo o que entendi do pedido; mostrando resultados só com os seus filtros.";
     static final String NOTHING_FOUND = "Nenhum título encontrado nas suas plataformas com esses critérios.";
+    // Quando a IA fica de fora: um aviso por motivo (o frontend mostra no lugar do aviso genérico)
+    static final String INTENT_FAILED = "A IA não respondeu desta vez: a busca usou só os filtros da tela.";
+    static final String INTENT_PAUSED = "A IA está fora do ar por alguns instantes: a busca usou só os filtros da tela.";
+    static final String PICK_FAILED = "A IA não conseguiu escolher desta vez: os títulos vieram na ordem do catálogo, sem justificativa.";
+    static final String PICK_PAUSED = "A IA está fora do ar por alguns instantes: os títulos vieram na ordem do catálogo, sem justificativa.";
+    static final String PICK_BUSY = "Muita gente buscando agora: a IA entendeu o pedido, mas os títulos vieram na ordem do catálogo, sem justificativa.";
 
     private final CatalogClient catalog;
     private final LlmClient llm;
     private final TextSanitizer sanitizer;
     private final CriteriaMerger merger;
+    private final AiGuard guard;
 
-    public RecommendService(CatalogClient catalog, LlmClient llm, TextSanitizer sanitizer, CriteriaMerger merger) {
+    public RecommendService(CatalogClient catalog, LlmClient llm, TextSanitizer sanitizer, CriteriaMerger merger,
+            AiGuard guard) {
         this.catalog = catalog;
         this.llm = llm;
         this.sanitizer = sanitizer;
         this.merger = merger;
+        this.guard = guard;
     }
 
     public RecommendResponse recommend(RecommendRequest request, String requestId) {
@@ -88,10 +98,15 @@ public class RecommendService {
         IntentResponse intent = null;
         if (text != null) {
             try {
-                intent = llm.intent(intentRequest(text));
+                IntentRequest intentRequest = intentRequest(text);
+                intent = guard.intent(() -> llm.intent(intentRequest));
+            } catch (AiUnavailableException e) {
+                log.info("/intent não chamado: circuito aberto");
+                notices.add(INTENT_PAUSED);
+                degraded = true;
             } catch (RestClientException e) {
-                // Sem aviso em notices: o frontend já avisa quando degraded = true
                 log.warn("llm-service /intent falhou: {}", e.getMessage());
+                notices.add(INTENT_FAILED);
                 degraded = true;
             }
             if (intent != null && Boolean.TRUE.equals(intent.offTopic())) {
@@ -121,8 +136,14 @@ public class RecommendService {
         if (mode == AiMode.PICK && intent != null && !candidates.isEmpty()) {
             try {
                 picks = pickWithAi(text, intent, candidates, limit);
+            } catch (AiUnavailableException e) {
+                boolean busy = e.reason() == AiGuard.Reason.BUSY;
+                log.info("/rerank não chamado: {}", busy ? "limite suave" : "circuito aberto");
+                notices.add(busy ? PICK_BUSY : PICK_PAUSED);
+                degraded = true;
             } catch (RestClientException e) {
                 log.warn("llm-service /rerank falhou: {}", e.getMessage());
+                notices.add(PICK_FAILED);
                 degraded = true;
             }
         }
@@ -182,7 +203,8 @@ public class RecommendService {
     // Modo "pick": a IA escolhe e justifica os títulos da página entre os candidatos reais
     private List<Pick> pickWithAi(String text, IntentResponse intent, List<TitleSummary> candidates, int limit) {
         List<Candidate> pool = toCandidates(candidates, rerankPool(limit));
-        RerankResponse rerank = llm.rerank(new RerankRequest(text, intent.summary(), pool, limit));
+        var rerankRequest = new RerankRequest(text, intent.summary(), pool, limit);
+        RerankResponse rerank = guard.rerank(limit, () -> llm.rerank(rerankRequest));
         return ground(rerank.picks(), candidates, limit);
     }
 

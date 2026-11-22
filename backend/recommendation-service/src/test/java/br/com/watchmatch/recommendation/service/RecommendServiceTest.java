@@ -14,6 +14,9 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 import br.com.watchmatch.recommendation.client.CatalogClient;
@@ -48,7 +51,8 @@ class RecommendServiceTest {
     private final CatalogClient catalog = mock(CatalogClient.class);
     private final LlmClient llm = mock(LlmClient.class);
     private final RecommendService service =
-            new RecommendService(catalog, llm, new TextSanitizer(), new CriteriaMerger());
+            new RecommendService(catalog, llm, new TextSanitizer(), new CriteriaMerger(),
+                    new AiGuard(AiGuard.Settings.DEFAULTS));
 
     @BeforeEach
     void catalogo() {
@@ -118,6 +122,7 @@ class RecommendServiceTest {
         RecommendResponse resposta = service.recommend(pedido("comédia leve", 2), "req-1");
 
         assertThat(resposta.degraded()).isTrue();
+        assertThat(resposta.notices()).containsExactly(RecommendService.INTENT_FAILED);
         assertThat(resposta.items()).extracting(Recommendation::title).containsExactly("Um", "Dois");
     }
 
@@ -129,7 +134,71 @@ class RecommendServiceTest {
         RecommendResponse resposta = service.recommend(pedido("comédia leve", 2), "req-1");
 
         assertThat(resposta.degraded()).isTrue();
+        assertThat(resposta.notices()).containsExactly(RecommendService.PICK_FAILED);
         assertThat(resposta.items()).extracting(Recommendation::title).containsExactly("Um", "Dois");
+    }
+
+    @Test
+    void comOCircuitoDoIntentAbertoNemChamaAIa() {
+        when(llm.intent(any())).thenThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY));
+        // Padrão: abre com 50% de falha a partir de 4 chamadas
+        for (int i = 0; i < 4; i++) {
+            service.recommend(pedido("comédia leve", 2), "req-" + i);
+        }
+
+        RecommendResponse resposta = service.recommend(pedido("comédia leve", 2), "req-5");
+
+        verify(llm, times(4)).intent(any());
+        assertThat(resposta.degraded()).isTrue();
+        assertThat(resposta.notices()).containsExactly(RecommendService.INTENT_PAUSED);
+        assertThat(resposta.items()).extracting(Recommendation::title).containsExactly("Um", "Dois");
+    }
+
+    @Test
+    void comOCircuitoDoRerankAbertoAIaAindaEntendeOPedido() {
+        when(llm.intent(any())).thenReturn(intent(new Criteria(null, List.of(35), null, null, null, null, null,
+                null, null, null)));
+        when(llm.rerank(any())).thenThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY));
+        for (int i = 0; i < 4; i++) {
+            service.recommend(pedido("comédia leve", 2), "req-" + i);
+        }
+
+        RecommendResponse resposta = service.recommend(pedido("comédia leve", 2), "req-5");
+
+        // Vira o modo "filters": o /intent continua, o /rerank fica de fora
+        verify(llm, times(5)).intent(any());
+        verify(llm, times(4)).rerank(any());
+        assertThat(resposta.criteria().criteria().genres()).containsExactly(35);
+        assertThat(resposta.notices()).containsExactly(RecommendService.PICK_PAUSED);
+        assertThat(resposta.items()).allSatisfy(item -> assertThat(item.reason()).isNull());
+    }
+
+    @Test
+    void erro4xxNaoAbreOCircuito() {
+        // 400 é bug do nosso pedido, não queda da IA
+        when(llm.intent(any())).thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST));
+        for (int i = 0; i < 6; i++) {
+            service.recommend(pedido("comédia leve", 2), "req-" + i);
+        }
+
+        verify(llm, times(6)).intent(any());
+    }
+
+    @Test
+    void semFichasDoLimiteSuaveABuscaVemSemAsEscolhasDaIa() {
+        when(llm.intent(any())).thenReturn(intent(Criteria.empty()));
+        when(llm.rerank(any())).thenReturn(new RerankResponse(List.of(new Pick(3, "movie", "Bom")), 0));
+
+        // 8 fichas por minuto; 48 títulos custam 4: duas buscas passam, a terceira fica sem IA
+        service.recommend(pedido("comédia leve", 48), "req-1");
+        service.recommend(pedido("comédia leve", 48), "req-2");
+        RecommendResponse resposta = service.recommend(pedido("comédia leve", 48), "req-3");
+
+        verify(llm, times(2)).rerank(any());
+        assertThat(resposta.degraded()).isTrue();
+        assertThat(resposta.notices()).containsExactly(RecommendService.PICK_BUSY);
+        assertThat(resposta.items()).extracting(Recommendation::title).containsExactly("Um", "Dois", "Três");
+        assertThat(resposta.items()).allSatisfy(item -> assertThat(item.reason()).isNull());
     }
 
     @Test
