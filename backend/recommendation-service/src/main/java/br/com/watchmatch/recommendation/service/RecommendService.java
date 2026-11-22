@@ -21,6 +21,9 @@ import br.com.watchmatch.recommendation.model.AiMode;
 import br.com.watchmatch.recommendation.model.AppliedCriteria;
 import br.com.watchmatch.recommendation.model.Catalog.DiscoverRequest;
 import br.com.watchmatch.recommendation.model.Catalog.Meta;
+import br.com.watchmatch.recommendation.model.Catalog.Reference;
+import br.com.watchmatch.recommendation.model.Catalog.SimilarRequest;
+import br.com.watchmatch.recommendation.model.Catalog.SimilarResult;
 import br.com.watchmatch.recommendation.model.Catalog.TitleDetail;
 import br.com.watchmatch.recommendation.model.Catalog.TitleList;
 import br.com.watchmatch.recommendation.model.Catalog.TitleRef;
@@ -62,6 +65,8 @@ public class RecommendService {
 
     static final String OFF_TOPIC = "Não entendi isso como um pedido de filme ou série; mostrando títulos populares.";
     static final String RELAXED = "Não achei nada com tudo o que entendi do pedido; mostrando resultados só com os seus filtros.";
+    static final String RELAXED_PARTIAL = "Não achei nada com todos os detalhes do pedido; deixei de lado: %s.";
+    static final String REFERENCE_NOT_FOUND = "Não achei \"%s\" no catálogo; mostrando pelo resto do pedido.";
     static final String NOTHING_FOUND = "Nenhum título encontrado nas suas plataformas com esses critérios.";
     // Quando a IA fica de fora: um aviso por motivo (o frontend mostra no lugar do aviso genérico)
     static final String INTENT_FAILED = "A IA não respondeu desta vez: a busca usou só os filtros da tela.";
@@ -116,15 +121,46 @@ public class RecommendService {
         }
         String summary = intent != null ? intent.summary() : null;
 
-        // 2. Mescla com os filtros da tela e busca candidatos reais no catálogo
-        MergedCriteria merged = merger.merge(request.filters(), intent, request.providers());
-        TitleList found = discover(merged, page, needed);
-        if (isEmpty(found) && intent != null) {
-            // A IA pode ter entendido critérios demais: tenta só com o que o usuário marcou
-            merged = merger.merge(request.filters(), null, request.providers());
-            found = discover(merged, page, needed);
-            notices.add(RELAXED);
-            summary = null;
+        // 2. Mescla com os filtros da tela e busca candidatos reais no catálogo ("parecido com X" usa o /similar).
+        // Se os critérios da IA zeram a busca, afrouxa aos poucos: primeiro as palavras-chave, depois idioma e
+        // duração mínima, e só então todos os critérios da IA. O filtro da tela nunca sai.
+        List<Attempt> attempts = attempts(intent, request.filters());
+        MergedCriteria merged = null;
+        TitleList found = null;
+        Reference reference = null;
+        boolean referenceMissing = false;
+        int used = 0;
+        for (; used < attempts.size(); used++) {
+            IntentResponse attempt = attempts.get(used).intent();
+            merged = merger.merge(request.filters(), attempt, request.providers());
+            String referenceTitle = attempt != null && !referenceMissing ? attempt.referenceTitle() : null;
+            if (referenceTitle != null) {
+                Similar similar = similar(referenceTitle, merged, page, needed);
+                if (similar.reference() == null) {
+                    referenceMissing = true;
+                    notices.add(REFERENCE_NOT_FOUND.formatted(referenceTitle));
+                    found = discover(merged, page, needed);
+                } else {
+                    reference = similar.reference();
+                    found = similar.found();
+                }
+            } else {
+                found = discover(merged, page, needed);
+            }
+            if (!isEmpty(found)) {
+                break;
+            }
+        }
+        used = Math.min(used, attempts.size() - 1);
+        if (used > 0) {
+            Attempt last = attempts.get(used);
+            if (last.intent() == null) {
+                notices.add(RELAXED);
+                summary = null;
+                reference = null;
+            } else {
+                notices.add(RELAXED_PARTIAL.formatted(String.join(", ", last.dropped())));
+            }
         }
         List<TitleSummary> candidates = isEmpty(found) ? List.of() : found.items();
         if (candidates.isEmpty()) {
@@ -155,7 +191,7 @@ public class RecommendService {
         List<Recommendation> items = details(picks, request.providers());
 
         var criteria = new AppliedCriteria(merged.criteria(), merged.providers(),
-                intent != null ? intent.referenceTitle() : null, summary, merged.sources());
+                reference != null ? reference.title() : null, summary, merged.sources());
         boolean hasMore = found != null && Boolean.TRUE.equals(found.hasMore()) && page < MAX_PAGE;
         return new RecommendResponse(requestId, page, hasMore, criteria, items, degraded, notices);
     }
@@ -200,11 +236,99 @@ public class RecommendService {
         return new TitleList(List.copyOf(items.values()), hasMore);
     }
 
+    // Uma tentativa de busca: o que a IA entendeu (null = só os filtros da tela) e o que foi deixado de lado
+    record Attempt(IntentResponse intent, List<String> dropped) {
+    }
+
+    // Do mais completo ao mais solto. Só tira o que veio da IA: se o usuário marcou o idioma na tela, ele fica
+    static List<Attempt> attempts(IntentResponse intent, Criteria filters) {
+        List<Attempt> attempts = new ArrayList<>();
+        attempts.add(new Attempt(intent, List.of()));
+        if (intent == null) {
+            return attempts;
+        }
+        Criteria ai = intent.criteria() != null ? intent.criteria() : Criteria.empty();
+        Criteria f = filters != null ? filters : Criteria.empty();
+        List<String> dropped = new ArrayList<>();
+        Criteria current = ai;
+
+        if (fromAiOnly(ai.keywords(), f.keywords())) {
+            current = current.withoutKeywords();
+            dropped.add("palavras-chave");
+            attempts.add(new Attempt(intent.withCriteria(current), List.copyOf(dropped)));
+        }
+        boolean language = fromAiOnly(ai.originalLanguage(), f.originalLanguage());
+        boolean runtimeMin = fromAiOnly(ai.runtimeMin(), f.runtimeMin());
+        if (language || runtimeMin) {
+            current = current.withoutLanguageAndRuntimeMin();
+            if (language) {
+                dropped.add("idioma");
+            }
+            if (runtimeMin) {
+                dropped.add("duração mínima");
+            }
+            attempts.add(new Attempt(intent.withCriteria(current), List.copyOf(dropped)));
+        }
+        attempts.add(new Attempt(null, List.of()));
+        return attempts;
+    }
+
+    private static boolean fromAiOnly(Object ai, Object filter) {
+        return isSet(ai) && !isSet(filter);
+    }
+
+    private static boolean isSet(Object value) {
+        if (value instanceof List<?> list) {
+            return !list.isEmpty();
+        }
+        if (value instanceof String text) {
+            return !text.isBlank();
+        }
+        return value != null;
+    }
+
+    private record Similar(TitleList found, Reference reference) {
+    }
+
+    // Como o discover: várias páginas do TMDB por página nossa. reference null = o catálogo não achou o título
+    private Similar similar(String title, MergedCriteria merged, int page, int needed) {
+        Criteria criteria = merged.criteria() != null ? merged.criteria() : Criteria.empty();
+        int perPage = Math.ceilDiv(needed, TMDB_PAGE_SIZE);
+        int first = (page - 1) * perPage + 1;
+
+        Map<String, TitleSummary> items = new LinkedHashMap<>();
+        Reference reference = null;
+        boolean hasMore = false;
+        for (int tmdbPage = first; tmdbPage < first + perPage; tmdbPage++) {
+            SimilarResult result = catalog.similar(new SimilarRequest(title, criteria, merged.providers(),
+                    CATALOG_LIMIT, tmdbPage));
+            if (result == null || result.reference() == null) {
+                if (reference == null) {
+                    return new Similar(null, null);
+                }
+                break;
+            }
+            reference = result.reference();
+            if (result.items() != null) {
+                result.items().forEach(t -> items.putIfAbsent(key(t.mediaType(), t.id()), t));
+            }
+            hasMore = Boolean.TRUE.equals(result.hasMore());
+            if (!hasMore) {
+                break;
+            }
+        }
+        return new Similar(new TitleList(List.copyOf(items.values()), hasMore), reference);
+    }
+
     // Modo "pick": a IA escolhe e justifica os títulos da página entre os candidatos reais
     private List<Pick> pickWithAi(String text, IntentResponse intent, List<TitleSummary> candidates, int limit) {
         List<Candidate> pool = toCandidates(candidates, rerankPool(limit));
         var rerankRequest = new RerankRequest(text, intent.summary(), pool, limit);
         RerankResponse rerank = guard.rerank(limit, () -> llm.rerank(rerankRequest));
+        // Resposta vazia: segue na ordem do catálogo em vez de quebrar a busca
+        if (rerank == null || rerank.picks() == null) {
+            return List.of();
+        }
         return ground(rerank.picks(), candidates, limit);
     }
 

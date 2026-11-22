@@ -18,6 +18,24 @@ public final class Catalog {
             Integer page) {
     }
 
+    // "Parecido com X": o título citado + os mesmos critérios do /discover
+    public record SimilarRequest(
+            String title,
+            @JsonUnwrapped Criteria criteria,
+            List<Integer> providers,
+            Integer limit,
+            Integer page) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Reference(Integer id, String mediaType, String title) {
+    }
+
+    // reference null = o catálogo não achou o título citado
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SimilarResult(Reference reference, List<TitleSummary> items, Boolean hasMore) {
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record TitleSummary(
             Integer id,

@@ -20,6 +20,11 @@ public final class Llm {
             String referenceTitle,
             String summary,
             Boolean offTopic) {
+
+        // A mesma resposta com outros critérios (usado ao afrouxar a busca)
+        public IntentResponse withCriteria(Criteria criteria) {
+            return new IntentResponse(criteria, providers, referenceTitle, summary, offTopic);
+        }
     }
 
     public record Candidate(Integer id, String mediaType, String title, Integer year, String overview,

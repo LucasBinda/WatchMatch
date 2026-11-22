@@ -8,7 +8,7 @@ info:
 
     Fluxo: sanitiza o texto → llm-service `/intent` → mescla com os filtros
     explícitos (os filtros da UI sempre vencem) → catalog-service `/discover`
-    (e `/search` + `/similar` se houver título de referência) → llm-service
+    (ou `/similar` se houver título de referência) → llm-service
     `/rerank` → grounding (descarta ids fora dos candidatos) → catalog-service
     `/titles/lookup` para enriquecer os itens finais.
 

@@ -8,6 +8,8 @@ import br.com.watchmatch.recommendation.model.Catalog.DiscoverRequest;
 import br.com.watchmatch.recommendation.model.Catalog.LookupRequest;
 import br.com.watchmatch.recommendation.model.Catalog.LookupResult;
 import br.com.watchmatch.recommendation.model.Catalog.Meta;
+import br.com.watchmatch.recommendation.model.Catalog.SimilarRequest;
+import br.com.watchmatch.recommendation.model.Catalog.SimilarResult;
 import br.com.watchmatch.recommendation.model.Catalog.TitleDetail;
 import br.com.watchmatch.recommendation.model.Catalog.TitleList;
 import br.com.watchmatch.recommendation.model.Catalog.TitleRef;
@@ -27,6 +29,10 @@ public class CatalogClient {
 
     public TitleList discover(DiscoverRequest request) {
         return rest.post().uri("/discover").body(request).retrieve().body(TitleList.class);
+    }
+
+    public SimilarResult similar(SimilarRequest request) {
+        return rest.post().uri("/similar").body(request).retrieve().body(SimilarResult.class);
     }
 
     public List<TitleDetail> lookup(List<TitleRef> refs) {

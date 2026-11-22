@@ -19,4 +19,16 @@ public record Criteria(
     public static Criteria empty() {
         return new Criteria(null, null, null, null, null, null, null, null, null, null);
     }
+
+    // Para afrouxar a busca: sem as palavras-chave
+    public Criteria withoutKeywords() {
+        return new Criteria(mediaType, genres, excludeGenres, runtimeMin, runtimeMax, yearFrom, yearTo,
+                originalLanguage, certificationMax, null);
+    }
+
+    // Para afrouxar a busca: sem idioma original e sem duração mínima
+    public Criteria withoutLanguageAndRuntimeMin() {
+        return new Criteria(mediaType, genres, excludeGenres, null, runtimeMax, yearFrom, yearTo, null,
+                certificationMax, keywords);
+    }
 }

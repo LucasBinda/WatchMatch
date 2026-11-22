@@ -25,6 +25,9 @@ import br.com.watchmatch.recommendation.model.AiMode;
 import br.com.watchmatch.recommendation.model.Catalog.DiscoverRequest;
 import br.com.watchmatch.recommendation.model.Catalog.Genres;
 import br.com.watchmatch.recommendation.model.Catalog.Meta;
+import br.com.watchmatch.recommendation.model.Catalog.Reference;
+import br.com.watchmatch.recommendation.model.Catalog.SimilarRequest;
+import br.com.watchmatch.recommendation.model.Catalog.SimilarResult;
 import br.com.watchmatch.recommendation.model.Catalog.TitleDetail;
 import br.com.watchmatch.recommendation.model.Catalog.TitleList;
 import br.com.watchmatch.recommendation.model.Catalog.TitleRef;
@@ -324,6 +327,77 @@ class RecommendServiceTest {
         var rerank = ArgumentCaptor.forClass(RerankRequest.class);
         verify(llm).rerank(rerank.capture());
         assertThat(rerank.getValue().candidates().get(0).overview()).hasSizeLessThanOrEqualTo(300);
+    }
+
+    @Test
+    void parecidoComXUsaOSimilarEMostraONomeDoCatalogo() {
+        when(llm.intent(any())).thenReturn(new IntentResponse(Criteria.empty(), List.of(), "interestelar",
+                "Parecido com Interestelar", false));
+        when(catalog.similar(any())).thenReturn(new SimilarResult(new Reference(157336, "movie", "Interestelar"),
+                List.of(resumo(3, "Três"), resumo(1, "Um")), false));
+
+        RecommendResponse resposta = service.recommend(pedido("parecido com interestelar", 2), "req-1");
+
+        var pedido = ArgumentCaptor.forClass(SimilarRequest.class);
+        verify(catalog).similar(pedido.capture());
+        assertThat(pedido.getValue().title()).isEqualTo("interestelar");
+        verify(catalog, never()).discover(any());
+        assertThat(resposta.items()).extracting(Recommendation::title).containsExactly("Três", "Um");
+        assertThat(resposta.criteria().referenceTitle()).isEqualTo("Interestelar");
+    }
+
+    @Test
+    void referenciaNaoEncontradaAvisaEBuscaPeloRestoDoPedido() {
+        when(llm.intent(any())).thenReturn(new IntentResponse(Criteria.empty(), List.of(), "Filme Inventado",
+                "Parecido com Filme Inventado", false));
+        when(catalog.similar(any())).thenReturn(new SimilarResult(null, List.of(), false));
+
+        RecommendResponse resposta = service.recommend(pedido("parecido com Filme Inventado", 2), "req-1");
+
+        assertThat(resposta.notices()).containsExactly(RecommendService.REFERENCE_NOT_FOUND.formatted("Filme Inventado"));
+        assertThat(resposta.criteria().referenceTitle()).isNull();
+        assertThat(resposta.items()).extracting(Recommendation::title).containsExactly("Um", "Dois");
+    }
+
+    @Test
+    void afrouxaAosPoucosComecandoPelasPalavrasChave() {
+        when(llm.intent(any())).thenReturn(intent(new Criteria(null, List.of(35), null, null, null, null, null,
+                null, null, List.of("heist"))));
+        // Com a palavra-chave não acha nada; sem ela, acha
+        when(catalog.discover(any())).thenAnswer(call -> {
+            DiscoverRequest pedido = call.getArgument(0);
+            boolean comPalavras = pedido.criteria().keywords() != null && !pedido.criteria().keywords().isEmpty();
+            return comPalavras ? new TitleList(List.of(), false)
+                    : new TitleList(List.of(resumo(1, "Um"), resumo(2, "Dois")), false);
+        });
+
+        RecommendResponse resposta = service.recommend(pedido("comédia de assalto", 2), "req-1");
+
+        assertThat(resposta.notices()).contains(RecommendService.RELAXED_PARTIAL.formatted("palavras-chave"));
+        // O gênero que a IA entendeu continua valendo
+        assertThat(resposta.criteria().criteria().genres()).containsExactly(35);
+        assertThat(resposta.criteria().summary()).isEqualTo("Comédia leve");
+        verify(catalog, times(2)).discover(any());
+    }
+
+    @Test
+    void tentativasSoTiramOQueVeioDaIa() {
+        var ia = intent(new Criteria(null, null, null, 120, null, null, null, "ko", null, List.of("heist")));
+        // O usuário marcou o idioma na tela: ele nunca sai
+        var tela = new Criteria(null, null, null, null, null, null, null, "ko", null, null);
+
+        var tentativas = RecommendService.attempts(ia, tela);
+
+        assertThat(tentativas).hasSize(4);
+        assertThat(tentativas.get(1).dropped()).containsExactly("palavras-chave");
+        assertThat(tentativas.get(2).dropped()).containsExactly("palavras-chave", "duração mínima");
+        assertThat(tentativas.get(2).intent().criteria().runtimeMin()).isNull();
+        assertThat(tentativas.get(3).intent()).isNull();
+    }
+
+    @Test
+    void semIaUmaTentativaSo() {
+        assertThat(RecommendService.attempts(null, null)).hasSize(1);
     }
 
     private static RecommendRequest pedido(String texto, int limit) {
