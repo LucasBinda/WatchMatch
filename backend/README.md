@@ -24,6 +24,5 @@ e os títulos vêm na ordem do catálogo.
 
 ## Ainda falta
 
-- circuit breaker (Resilience4j) no recommendation-service; hoje há só timeout;
 - no catalog: `keywords`, `originalLanguage` e `runtimeMin` ainda não viram filtros no TMDB, e `/search` e `/similar`
   (para "parecido com X") não existem.

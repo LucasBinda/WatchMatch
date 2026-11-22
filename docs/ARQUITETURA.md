@@ -99,9 +99,30 @@ O passo 6 é a mitigação de alucinação e prompt injection descrita em [IA_RE
 
 ### Resiliência
 
-- **Timeout + circuit breaker** (Resilience4j) no recommendation-service.
-- Se o llm-service falhar, a resposta sai com os resultados do catálogo **sem justificativas** (degradação controlada).
-- Demonstração prevista no vídeo: derrubar o container do llm-service e mostrar o app continuando a funcionar.
+Toda chamada à IA passa pelo `AiGuard` do recommendation-service (núcleo do Resilience4j, sem o starter, que é
+feito para o Spring Boot 3). Se a IA ficar de fora, a resposta sai com os resultados do catálogo **sem
+justificativas**, `degraded: true` e um aviso em `notices` dizendo o motivo (degradação controlada).
+
+| Peça | Como funciona |
+| ---- | ------------- |
+| Timeout | 2 s para conectar; 40 s de leitura no llm-service (48 justificativas levam tempo) |
+| Circuit breaker, um para o `/intent` e outro para o `/rerank` | Abre com 50% de falha nas últimas 10 chamadas (mínimo 4). Fica aberto 30 s: a busca nem tenta a IA e responde na hora. Depois deixa passar 2 chamadas de teste; deram certo, fecha. Contam como falha: 5xx (o llm-service devolve 502 quando o Groq falha ou estoura a cota), timeout e erro de conexão. Erro 4xx não conta, porque é bug do nosso pedido |
+| Limite suave do `/rerank` | 8 fichas por minuto no site, cobradas pelo tamanho da página: 12 títulos = 1 ficha, 24 = 2, 36 = 3, 48 = 4. Sem ficha, a busca não falha: vem na ordem do catálogo. Acompanha os 8k tokens/min do Groq gratuito |
+
+Os circuitos são separados porque o `/rerank` é o que pesa. Se só ele cair, a IA ainda entende o pedido e a
+busca vira o modo `filters`. Os números são ajustáveis por variável de ambiente (`AI_CIRCUIT_OPEN_FOR`,
+`AI_RERANK_PERMITS` etc., ver `AiGuardConfig`). Os contadores ficam na memória do serviço.
+
+| Situação | Aviso para o usuário |
+| -------- | -------------------- |
+| `/intent` falhou | "A IA não respondeu desta vez: a busca usou só os filtros da tela." |
+| Circuito do `/intent` aberto | "A IA está fora do ar por alguns instantes: a busca usou só os filtros da tela." |
+| `/rerank` falhou ou circuito aberto | "…os títulos vieram na ordem do catálogo, sem justificativa." |
+| Sem fichas do limite suave | "Muita gente buscando agora: a IA entendeu o pedido, mas os títulos vieram na ordem do catálogo…" |
+
+**Demonstração do vídeo:** `docker compose stop llm-service`. As primeiras buscas (até 4) tentam a IA e falham, e a partir
+daí o circuito abre e as buscas respondem em menos de 1 s, sem IA. Depois `docker compose start llm-service`;
+passados 30 s, a IA volta sozinha.
 
 ## 5. Gateway
 
@@ -136,8 +157,8 @@ Passou do limite: `429` em `application/problem+json`, com `Retry-After: 10`, e 
 
 Modelos avaliados e descartados por ora: só por IP (não protege a cota com muitos usuários e barra uma sala
 inteira atrás do mesmo Wi-Fi); por custo em tokens, com Bucket4j (mais justo, mas exige código e contadores);
-cota diária por IP (exige Redis ou Postgres). No item de resiliência entra o limite **suave**: quando o Groq ou
-o limite apertam, a busca cai para o modo `filters` em vez de falhar.
+cota diária por IP (exige Redis ou Postgres). Abaixo do gateway há ainda o limite **suave** do recommendation-service (seção 4, "Resiliência"): quando o
+Groq ou as fichas apertam, a busca cai para o modo `filters` em vez de falhar.
 
 No deploy atrás de um proxy (Render, Railway), o Nginx precisa do `real_ip` para enxergar o IP do usuário;
 o trecho está comentado no `nginx.conf`.
