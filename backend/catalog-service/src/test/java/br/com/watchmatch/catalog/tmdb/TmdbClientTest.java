@@ -121,4 +121,69 @@ class TmdbClientTest {
 
         assertThat(client.details(TitleType.TV, 1396).name()).isEqualTo("Breaking Bad");
     }
+
+    @Test
+    void buscaPalavraChavePeloTexto() {
+        tmdbFalso.expect(requestTo("https://api.themoviedb.org/3/search/keyword?query=time%20travel"))
+                .andRespond(withSuccess("{\"results\":[{\"id\":4379,\"name\":\"time travel\"}]}",
+                        MediaType.APPLICATION_JSON));
+
+        TmdbKeywordPage pagina = client.searchKeyword("time travel");
+
+        assertThat(pagina.results()).extracting(TmdbKeywordPage.TmdbKeyword::id).containsExactly(4379);
+        tmdbFalso.verify();
+    }
+
+    @Test
+    void buscaPorNomeTrazOTipoDeCadaResultado() {
+        tmdbFalso.expect(requestTo(
+                "https://api.themoviedb.org/3/search/multi?query=Interestelar&language=pt-BR&include_adult=false"))
+                .andRespond(withSuccess("""
+                    {"results": [
+                        {"id": 157336, "media_type": "movie", "title": "Interestelar", "genre_ids": [12, 878]},
+                        {"id": 1, "media_type": "person", "name": "Alguém"}
+                    ]}
+                    """, MediaType.APPLICATION_JSON));
+
+        TmdbMultiPage pagina = client.searchMulti("Interestelar");
+
+        assertThat(pagina.results()).extracting(TmdbMultiPage.TmdbMultiResult::mediaType)
+                .containsExactly("movie", "person");
+        assertThat(pagina.results().get(0).toResult().genreIds()).containsExactly(12, 878);
+    }
+
+    @Test
+    void palavrasChaveDaReferenciaDeFilmeEDeSerie() {
+        tmdbFalso.expect(requestTo(
+                "https://api.themoviedb.org/3/movie/157336?language=pt-BR&append_to_response=keywords"))
+                .andRespond(withSuccess("""
+                    {"id": 157336, "title": "Interestelar", "genres": [{"id": 878, "name": "Ficção científica"}],
+                     "keywords": {"keywords": [{"id": 9882, "name": "space travel"}]}}
+                    """, MediaType.APPLICATION_JSON));
+        tmdbFalso.expect(requestTo("https://api.themoviedb.org/3/tv/1399?language=pt-BR&append_to_response=keywords"))
+                .andRespond(withSuccess("""
+                    {"id": 1399, "name": "Game of Thrones", "keywords": {"results": [{"id": 818, "name": "dragon"}]}}
+                    """, MediaType.APPLICATION_JSON));
+
+        TmdbReference filme = client.reference(TitleType.MOVIE, 157336);
+        TmdbReference serie = client.reference(TitleType.TV, 1399);
+
+        assertThat(filme.displayTitle()).isEqualTo("Interestelar");
+        assertThat(filme.genreIds()).containsExactly(878);
+        assertThat(filme.keywordIds()).containsExactly(9882);
+        assertThat(serie.displayTitle()).isEqualTo("Game of Thrones");
+        assertThat(serie.keywordIds()).containsExactly(818);
+    }
+
+    @Test
+    void recomendacoesDeUmTitulo() {
+        tmdbFalso.expect(requestTo("https://api.themoviedb.org/3/movie/157336/recommendations?language=pt-BR&page=2"))
+                .andRespond(withSuccess("{\"page\":2,\"total_pages\":3,\"results\":[{\"id\":27205}]}",
+                        MediaType.APPLICATION_JSON));
+
+        TmdbPage pagina = client.recommendations(TitleType.MOVIE, 157336, 2);
+
+        assertThat(pagina.results()).extracting(TmdbResult::id).containsExactly(27205);
+        assertThat(pagina.totalPages()).isEqualTo(3);
+    }
 }

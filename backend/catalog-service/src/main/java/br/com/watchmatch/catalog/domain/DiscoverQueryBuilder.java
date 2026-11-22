@@ -8,6 +8,11 @@ import java.util.stream.Collectors;
 public class DiscoverQueryBuilder {
 
     public Map<String, String> build(DiscoverRequest request, TitleType type) {
+        return build(request, type, List.of());
+    }
+
+    // keywordIds: as palavras-chave já traduzidas para ids do TMDB (o TMDB não filtra por texto)
+    public Map<String, String> build(DiscoverRequest request, TitleType type, List<Integer> keywordIds) {
         Map<String, String> params = new HashMap<>();
         params.put("watch_region", "BR");
         params.put("with_watch_providers", joinWithPipe(request.providers()));
@@ -25,8 +30,21 @@ public class DiscoverQueryBuilder {
             params.put("without_genres", joinWithPipe(criteria.excludeGenres()));
         }
 
+        if (criteria.runtimeMin() != null) {
+            params.put("with_runtime.gte", String.valueOf(criteria.runtimeMin()));
+        }
+
         if (criteria.runtimeMax() != null) {
             params.put("with_runtime.lte", String.valueOf(criteria.runtimeMax()));
+        }
+
+        if (criteria.originalLanguage() != null && !criteria.originalLanguage().isBlank()) {
+            params.put("with_original_language", criteria.originalLanguage());
+        }
+
+        // "|" = qualquer uma das palavras: "E" entre todas quase sempre zera a busca
+        if (keywordIds != null && !keywordIds.isEmpty()) {
+            params.put("with_keywords", joinWithPipe(keywordIds));
         }
 
         // Filme e série guardam a data com nomes diferentes no TMDB

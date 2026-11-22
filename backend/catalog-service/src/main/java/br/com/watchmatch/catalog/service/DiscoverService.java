@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
@@ -15,6 +16,7 @@ import br.com.watchmatch.catalog.domain.TitleType;
 import br.com.watchmatch.catalog.tmdb.TitleMapper;
 import br.com.watchmatch.catalog.tmdb.TmdbClient;
 import br.com.watchmatch.catalog.tmdb.TmdbPage;
+import br.com.watchmatch.catalog.tmdb.TmdbResult;
 
 @Service
 public class DiscoverService {
@@ -22,17 +24,27 @@ public class DiscoverService {
     private final TmdbClient client;
     private final DiscoverQueryBuilder queryBuilder;
     private final TitleMapper mapper;
+    private final KeywordResolver keywords;
 
     // A lista de gêneros quase nunca muda: busca uma vez por tipo e guarda
     private final Map<TitleType, Map<Integer, String>> genreNames = new ConcurrentHashMap<>();
 
-    public DiscoverService(TmdbClient client, DiscoverQueryBuilder queryBuilder, TitleMapper mapper) {
+    public DiscoverService(TmdbClient client, DiscoverQueryBuilder queryBuilder, TitleMapper mapper,
+            KeywordResolver keywords) {
         this.client = client;
         this.queryBuilder = queryBuilder;
         this.mapper = mapper;
+        this.keywords = keywords;
     }
 
     public TitleList discover(DiscoverRequest request, int limit) {
+        return discover(request, limit, List.of());
+    }
+
+    // extraKeywordIds: ids que já vêm prontos (as palavras-chave do título de referência, no /similar)
+    public TitleList discover(DiscoverRequest request, int limit, List<Integer> extraKeywordIds) {
+        List<Integer> keywordIds = Stream.concat(keywords.ids(request.criteria().keywords()).stream(),
+                extraKeywordIds.stream()).distinct().toList();
         // Sem mediaType, busca os dois tipos
         List<TitleType> types = request.mediaType() != null
                 ? List.of(request.mediaType())
@@ -42,7 +54,7 @@ public class DiscoverService {
         boolean hasMore = false;
 
         for (TitleType type : types) {
-            TmdbPage page = client.discover(type, queryBuilder.build(request, type));
+            TmdbPage page = client.discover(type, queryBuilder.build(request, type, keywordIds));
             perType.add(toSummaries(page, type));
             hasMore |= hasNextPage(page);
         }
@@ -51,7 +63,12 @@ public class DiscoverService {
         return new TitleList(items.subList(0, Math.min(limit, items.size())), hasMore);
     }
 
-    private List<TitleSummary> toSummaries(TmdbPage page, TitleType type) {
+    // Um resultado avulso do TMDB (ex.: da busca por nome), com os nomes dos gêneros em português
+    TitleSummary toSummary(TmdbResult result, TitleType type) {
+        return mapper.toSummary(result, type, genreNames.computeIfAbsent(type, client::genres));
+    }
+
+    List<TitleSummary> toSummaries(TmdbPage page, TitleType type) {
         if (page.results() == null) {
             return List.of();
         }
@@ -61,7 +78,7 @@ public class DiscoverService {
                 .toList();
     }
 
-    private boolean hasNextPage(TmdbPage page) {
+    static boolean hasNextPage(TmdbPage page) {
         return page.page() != null && page.totalPages() != null && page.page() < page.totalPages();
     }
 

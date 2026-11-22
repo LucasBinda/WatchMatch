@@ -183,4 +183,31 @@ class DiscoverQueryBuilderTest {
 
         assertThat(builder.build(request, TitleType.MOVIE)).containsEntry("page", "3");
     }
+
+    @Test
+    void duracaoMinimaEIdiomaOriginal() {
+        var criteria = Criteria.empty().withRuntimeMin(120).withOriginalLanguage("ko");
+
+        Map<String, String> params = builder.build(new DiscoverRequest(criteria, List.of(8)), TitleType.MOVIE);
+
+        assertThat(params)
+                .containsEntry("with_runtime.gte", "120")
+                .containsEntry("with_original_language", "ko");
+    }
+
+    @Test
+    void palavrasChaveViramIdsComOu() {
+        Map<String, String> params = builder.build(new DiscoverRequest(Criteria.empty(), List.of(8)),
+                TitleType.TV, List.of(10051, 9663));
+
+        assertThat(params).containsEntry("with_keywords", "10051|9663");
+    }
+
+    @Test
+    void semPalavrasChaveNemIdiomaNaoMandaOsFiltros() {
+        Map<String, String> params = builder.build(new DiscoverRequest(Criteria.empty(), List.of(8)),
+                TitleType.MOVIE, List.of());
+
+        assertThat(params).doesNotContainKeys("with_keywords", "with_original_language", "with_runtime.gte");
+    }
 }

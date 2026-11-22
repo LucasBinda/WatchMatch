@@ -54,6 +54,9 @@ paths:
         `watch_region=BR`, `with_watch_providers` (OR entre as plataformas) e
         `with_watch_monetization_types=flatrate|free|ads` (ou seja, incluído na assinatura).
         Sem `mediaType`, busca filmes e séries e intercala os resultados.
+        `runtimeMin` vira `with_runtime.gte`, `originalLanguage` vira `with_original_language` e cada
+        palavra-chave vira um id do TMDB (`/search/keyword`, com cache), unidas por OU em `with_keywords`.
+        Palavra sem correspondência no TMDB é ignorada.
       operationId: discover
       parameters:
         - $ref: './common.yaml#/components/parameters/RequestId'
@@ -78,7 +81,9 @@ paths:
   /search:
     get:
       summary: Busca títulos pelo nome
-      description: Usado para resolver referências como "parecido com Interestelar".
+      description: |
+        Busca em filmes e séries (`/search/multi` do TMDB), na ordem de relevância. Não filtra por
+        plataforma. `hasMore` é sempre false: só a primeira página do TMDB.
       operationId: searchTitles
       parameters:
         - $ref: './common.yaml#/components/parameters/RequestId'
@@ -134,40 +139,36 @@ paths:
         '502':
           $ref: './common.yaml#/components/responses/UpstreamError'
 
-  /titles/{mediaType}/{id}/similar:
-    get:
-      summary: Títulos parecidos disponíveis nas plataformas informadas
-      description: Baseado em `/recommendations` do TMDB, filtrado por disponibilidade no BR.
-      operationId: getSimilar
+  /similar:
+    post:
+      summary: Títulos parecidos com um título citado pelo nome, nas plataformas informadas
+      description: |
+        "Parecido com X" no modelo híbrido:
+        1. acha X pelo nome (`/search/multi` do TMDB, filmes e séries);
+        2. primeiro, as recomendações do TMDB para X (`/{type}/{id}/recommendations`) que estão nas
+           plataformas do usuário (assinatura, grátis ou com anúncios) e respeitam os critérios;
+        3. completa com um discover pelos gêneros e até 8 palavras-chave de X (OU entre elas).
+        O próprio X nunca aparece. Sem `mediaType`, os resultados são do tipo de X. Com outro tipo
+        ("série parecida com um filme"), não há recomendações e o discover usa só as palavras-chave,
+        porque filme e série têm ids de gênero diferentes. `page` avança as duas fontes juntas.
+      operationId: similar
       parameters:
         - $ref: './common.yaml#/components/parameters/RequestId'
-        - $ref: '#/components/parameters/MediaTypePath'
-        - $ref: '#/components/parameters/TitleIdPath'
-        - name: providers
-          in: query
-          required: false
-          description: Ids de plataforma separados por vírgula; se ausente, não filtra por plataforma
-          schema:
-            type: string
-            pattern: '^\d+(,\d+)*$'
-            example: '8,119'
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 40
-            default: 20
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimilarRequest'
       responses:
         '200':
-          description: Títulos parecidos
+          description: Títulos parecidos; `reference` null quando X não foi encontrado
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TitleList'
-        '404':
-          $ref: './common.yaml#/components/responses/NotFound'
+                $ref: '#/components/schemas/SimilarResult'
+        '400':
+          $ref: './common.yaml#/components/responses/BadRequest'
         '502':
           $ref: './common.yaml#/components/responses/UpstreamError'
 
@@ -279,6 +280,62 @@ components:
               type: string
               enum: [popularity, rating, recent]
               default: popularity
+
+    SimilarRequest:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/Criteria'
+        - type: object
+          required: [title, providers]
+          properties:
+            title:
+              type: string
+              minLength: 1
+              maxLength: 100
+              description: Nome citado pelo usuário, em qualquer idioma que o TMDB conheça
+              example: Interestelar
+            providers:
+              type: array
+              minItems: 1
+              items:
+                type: integer
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 60
+              default: 40
+            page:
+              type: integer
+              minimum: 1
+              maximum: 500
+              default: 1
+
+    SimilarResult:
+      type: object
+      required: [items, hasMore]
+      properties:
+        reference:
+          oneOf:
+            - $ref: '#/components/schemas/Reference'
+            - type: 'null'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TitleSummary'
+        hasMore:
+          type: boolean
+
+    Reference:
+      type: object
+      description: O título X como o TMDB o encontrou
+      required: [id, mediaType, title]
+      properties:
+        id:
+          type: integer
+        mediaType:
+          $ref: './common.yaml#/components/schemas/MediaType'
+        title:
+          type: string
+          example: Interestelar
 
     TitleRef:
       type: object

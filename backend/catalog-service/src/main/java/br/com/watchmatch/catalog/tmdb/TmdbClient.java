@@ -54,6 +54,42 @@ public class TmdbClient {
                 .body(TmdbDetail.class);
     }
 
+    // Ids das palavras-chave do TMDB que batem com o texto (em inglês: "heist")
+    public TmdbKeywordPage searchKeyword(String query) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/search/keyword").queryParam("query", query).build())
+                .retrieve()
+                .body(TmdbKeywordPage.class);
+    }
+
+    // Busca por nome em filmes e séries ao mesmo tempo ("Interestelar" acha pelo título em português)
+    public TmdbMultiPage searchMulti(String query) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/search/multi")
+                        .queryParam("query", query)
+                        .queryParam("language", "pt-BR")
+                        .queryParam("include_adult", "false")
+                        .build())
+                .retrieve()
+                .body(TmdbMultiPage.class);
+    }
+
+    // Nome, gêneros e palavras-chave do título de referência
+    public TmdbReference reference(TitleType type, int id) {
+        return restClient.get()
+                .uri("/{type}/{id}?language=pt-BR&append_to_response=keywords", type.name().toLowerCase(), id)
+                .retrieve()
+                .body(TmdbReference.class);
+    }
+
+    // "Quem gostou de X também gostou de": 20 por página, sem filtro de plataforma
+    public TmdbPage recommendations(TitleType type, int id, int page) {
+        return restClient.get()
+                .uri("/{type}/{id}/recommendations?language=pt-BR&page={page}", type.name().toLowerCase(), id, page)
+                .retrieve()
+                .body(TmdbPage.class);
+    }
+
     // Plataformas com catálogo no Brasil (a lista de filmes cobre as de séries também)
     public List<TmdbProvider> providers() {
         TmdbProviderList list = restClient.get()

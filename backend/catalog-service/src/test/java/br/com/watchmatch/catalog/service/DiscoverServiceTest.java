@@ -35,7 +35,8 @@ import br.com.watchmatch.catalog.tmdb.TmdbResult;
 class DiscoverServiceTest {
 
     private final TmdbClient client = mock(TmdbClient.class);
-    private final DiscoverService service = new DiscoverService(client, new DiscoverQueryBuilder(), new TitleMapper());
+    private final DiscoverService service = new DiscoverService(client, new DiscoverQueryBuilder(), new TitleMapper(),
+            new KeywordResolver(client));
 
     @BeforeEach
     void generosDoTmdb() {
