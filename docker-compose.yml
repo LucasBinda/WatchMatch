@@ -77,7 +77,8 @@ services:
       context: ./backend/gateway
     ports:
       - "8080:80"
-    # O Nginx confere na partida se os nomes dos destinos existem: só sobe depois de todos
+    # Só sobe depois de todos, para não dar 502 nos primeiros pedidos. Os nomes são resolvidos pelo DNS do
+    # Docker a cada 10 s (backend/gateway/nginx.conf): recriar um serviço não exige reiniciar o gateway
     depends_on:
       catalog-service:
         condition: service_healthy
