@@ -2,9 +2,15 @@ package br.com.watchmatch.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -41,6 +47,46 @@ class TitleServiceTest {
                 new TitleRef(TitleType.MOVIE, 1)));
 
         assertThat(itens).extracting(TitleDetail::id).containsExactly(2, 1);
+    }
+
+    @Test
+    void fichaFicaEmCacheAteVencerAValidade() {
+        var relogio = new RelogioDeTeste();
+        var comCache = new TitleService(client, new TitleMapper(new WatchUrlBuilder()), relogio);
+        when(client.details(TitleType.MOVIE, 1)).thenReturn(detalhe(1, "Filme"));
+
+        comCache.get(TitleType.MOVIE, 1);
+        comCache.get(TitleType.MOVIE, 1);
+        verify(client, times(1)).details(TitleType.MOVIE, 1);
+
+        // Passou da validade: as plataformas podem ter mudado, então busca de novo
+        relogio.avancar(TitleService.CACHE_TTL.plusMinutes(1));
+        comCache.get(TitleType.MOVIE, 1);
+        verify(client, times(2)).details(TitleType.MOVIE, 1);
+    }
+
+    // Relógio que só anda quando o teste manda
+    private static final class RelogioDeTeste extends Clock {
+        private Instant agora = Instant.parse("2026-11-22T12:00:00Z");
+
+        void avancar(Duration tempo) {
+            agora = agora.plus(tempo);
+        }
+
+        @Override
+        public Instant instant() {
+            return agora;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("UTC");
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
     }
 
     private static TmdbDetail detalhe(int id, String nome) {

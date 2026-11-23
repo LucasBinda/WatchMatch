@@ -1,11 +1,15 @@
 package br.com.watchmatch.catalog.service;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 
@@ -18,16 +22,31 @@ import br.com.watchmatch.catalog.tmdb.TmdbClient;
 @Service
 public class TitleService {
 
+    // A mesma ficha é pedida de novo no "Carregar mais", na conferência de duração do /discover e nos
+    // detalhes do resultado. As plataformas de um título mudam, mas não de hora em hora.
+    static final int CACHE_SIZE = 2000;
+    static final Duration CACHE_TTL = Duration.ofHours(6);
+
     private final TmdbClient client;
     private final TitleMapper mapper;
+    private final LruCache<TitleRef, TitleDetail> cache;
 
+    @Autowired
     public TitleService(TmdbClient client, TitleMapper mapper) {
-        this.client = client;
-        this.mapper = mapper;
+        this(client, mapper, Clock.systemUTC());
     }
 
+    // Os testes passam um relógio próprio para ver a validade do cache vencer
+    TitleService(TmdbClient client, TitleMapper mapper, Clock clock) {
+        this.client = client;
+        this.mapper = mapper;
+        this.cache = new LruCache<>(CACHE_SIZE, CACHE_TTL, clock);
+    }
+
+    // Título inexistente (404) não entra no cache: o erro sobe antes de guardar
     public TitleDetail get(TitleType type, int id) {
-        return mapper.toDetail(client.details(type, id), type);
+        return cache.get(new TitleRef(type, id),
+                ref -> Optional.of(mapper.toDetail(client.details(type, id), type))).orElseThrow();
     }
 
     // Busca todos ao mesmo tempo (uma thread virtual por título): 48 títulos levam o tempo de ~1

@@ -128,10 +128,7 @@ public class SimilarService {
 
     // Os mesmos critérios que o /discover aplica; informação que o TMDB não tem não elimina o título
     static boolean matches(TitleDetail d, Criteria c) {
-        if (d.runtime() != null && c.runtimeMin() != null && d.runtime() < c.runtimeMin()) {
-            return false;
-        }
-        if (d.runtime() != null && c.runtimeMax() != null && d.runtime() > c.runtimeMax()) {
+        if (!DiscoverService.runtimeFits(d.runtime(), c)) {
             return false;
         }
         if (d.year() != null && c.yearFrom() != null && d.year() < c.yearFrom()) {

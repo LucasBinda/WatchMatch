@@ -3,14 +3,18 @@ package br.com.watchmatch.catalog.service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
+import br.com.watchmatch.catalog.domain.Criteria;
 import br.com.watchmatch.catalog.domain.DiscoverQueryBuilder;
 import br.com.watchmatch.catalog.domain.DiscoverRequest;
 import br.com.watchmatch.catalog.domain.TitleList;
+import br.com.watchmatch.catalog.domain.TitleRef;
 import br.com.watchmatch.catalog.domain.TitleSummary;
 import br.com.watchmatch.catalog.domain.TitleType;
 import br.com.watchmatch.catalog.tmdb.TitleMapper;
@@ -25,16 +29,18 @@ public class DiscoverService {
     private final DiscoverQueryBuilder queryBuilder;
     private final TitleMapper mapper;
     private final KeywordResolver keywords;
+    private final TitleService titles;
 
     // A lista de gêneros quase nunca muda: busca uma vez por tipo e guarda
     private final Map<TitleType, Map<Integer, String>> genreNames = new ConcurrentHashMap<>();
 
     public DiscoverService(TmdbClient client, DiscoverQueryBuilder queryBuilder, TitleMapper mapper,
-            KeywordResolver keywords) {
+            KeywordResolver keywords, TitleService titles) {
         this.client = client;
         this.queryBuilder = queryBuilder;
         this.mapper = mapper;
         this.keywords = keywords;
+        this.titles = titles;
     }
 
     public TitleList discover(DiscoverRequest request, int limit) {
@@ -59,7 +65,7 @@ public class DiscoverService {
             hasMore |= hasNextPage(page);
         }
 
-        List<TitleSummary> items = interleave(perType);
+        List<TitleSummary> items = withinRuntime(interleave(perType), request.criteria());
         return new TitleList(items.subList(0, Math.min(limit, items.size())), hasMore);
     }
 
@@ -76,6 +82,30 @@ public class DiscoverService {
         return page.results().stream()
                 .map(result -> mapper.toSummary(result, type, names))
                 .toList();
+    }
+
+    // O filtro de duração do TMDB é frouxo: num teste, 32 de 60 animações "até 90 min" passavam disso
+    // (o índice de busca dele não bate com a ficha). Confere pela ficha em pt-BR, que é a duração mostrada
+    // no card. Só quando o pedido tem duração: são uma busca de ficha por candidato, em paralelo e em cache.
+    private List<TitleSummary> withinRuntime(List<TitleSummary> items, Criteria criteria) {
+        if (items.isEmpty() || (criteria.runtimeMin() == null && criteria.runtimeMax() == null)) {
+            return items;
+        }
+        List<TitleRef> refs = items.stream().map(t -> new TitleRef(t.mediaType(), t.id())).toList();
+        Set<TitleRef> fits = titles.lookup(refs).stream()
+                .filter(d -> runtimeFits(d.runtime(), criteria))
+                .map(d -> new TitleRef(d.mediaType(), d.id()))
+                .collect(Collectors.toSet());
+        return items.stream().filter(t -> fits.contains(new TitleRef(t.mediaType(), t.id()))).toList();
+    }
+
+    // Limite exato. Duração desconhecida não elimina o título (o TMDB não tem a de todos)
+    static boolean runtimeFits(Integer runtime, Criteria criteria) {
+        if (runtime == null) {
+            return true;
+        }
+        return (criteria.runtimeMin() == null || runtime >= criteria.runtimeMin())
+                && (criteria.runtimeMax() == null || runtime <= criteria.runtimeMax());
     }
 
     static boolean hasNextPage(TmdbPage page) {

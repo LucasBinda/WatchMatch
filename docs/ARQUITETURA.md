@@ -83,6 +83,14 @@ frontend ──POST /api/recommend {texto, filtros}──▶ gateway ──▶ r
 inglês, até 5) viram ids do TMDB (`/search/keyword`, com cache) e entram com **OU**: "E" entre todas quase
 sempre zera a busca nas plataformas do usuário. Palavra sem correspondência é ignorada.
 
+**Duração conferida pela ficha.** O filtro de duração do TMDB (`with_runtime`) é frouxo: o eval achou
+terrores "curtos" de 110 min, e num teste 32 de 60 animações "até 90 min" passavam disso. O índice de busca
+do TMDB não bate com a ficha, e a duração muda conforme o idioma da ficha (Nausicaä: 95 min na padrão, 117
+na pt-BR). Quando o pedido tem duração, o catalog-service busca a ficha pt-BR de cada candidato, que é a
+duração mostrada no card, e tira quem passa do limite. O limite é exato; título sem duração conhecida
+fica. As fichas ficam em cache por 6 h (até 2000), então "Carregar mais" e os detalhes do resultado não
+buscam de novo.
+
 **"Parecido com X" (modelo híbrido, `POST /similar` do catalog-service).**
 
 1. Acha X pelo nome (`/search/multi`), em filmes e séries.

@@ -57,6 +57,8 @@ paths:
         `runtimeMin` vira `with_runtime.gte`, `originalLanguage` vira `with_original_language` e cada
         palavra-chave vira um id do TMDB (`/search/keyword`, com cache), unidas por OU em `with_keywords`.
         Palavra sem correspondência no TMDB é ignorada.
+        Com `runtimeMin` ou `runtimeMax`, cada candidato é conferido pela duração da ficha pt-BR (o filtro
+        do TMDB é frouxo); título sem duração conhecida é mantido.
       operationId: discover
       parameters:
         - $ref: './common.yaml#/components/parameters/RequestId'
@@ -314,9 +316,11 @@ components:
       required: [items, hasMore]
       properties:
         reference:
-          oneOf:
+          description: Título usado como referência; null quando não foi encontrado
+          type: object
+          nullable: true
+          allOf:
             - $ref: '#/components/schemas/Reference'
-            - type: 'null'
         items:
           type: array
           items:

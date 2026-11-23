@@ -1,6 +1,8 @@
 package br.com.watchmatch.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -20,9 +22,11 @@ import br.com.watchmatch.catalog.domain.DiscoverQueryBuilder;
 import br.com.watchmatch.catalog.domain.DiscoverRequest;
 import br.com.watchmatch.catalog.domain.Genre;
 import br.com.watchmatch.catalog.domain.SortBy;
+import br.com.watchmatch.catalog.domain.TitleDetail;
 import br.com.watchmatch.catalog.domain.TitleList;
 import br.com.watchmatch.catalog.domain.TitleSummary;
 import br.com.watchmatch.catalog.domain.TitleType;
+import br.com.watchmatch.catalog.domain.WatchInfo;
 import br.com.watchmatch.catalog.tmdb.TitleMapper;
 import br.com.watchmatch.catalog.tmdb.TmdbClient;
 import br.com.watchmatch.catalog.tmdb.TmdbPage;
@@ -35,8 +39,9 @@ import br.com.watchmatch.catalog.tmdb.TmdbResult;
 class DiscoverServiceTest {
 
     private final TmdbClient client = mock(TmdbClient.class);
+    private final TitleService titles = mock(TitleService.class);
     private final DiscoverService service = new DiscoverService(client, new DiscoverQueryBuilder(), new TitleMapper(),
-            new KeywordResolver(client));
+            new KeywordResolver(client), titles);
 
     @BeforeEach
     void generosDoTmdb() {
@@ -113,6 +118,55 @@ class DiscoverServiceTest {
 
         assertThat(lista.items()).isEmpty();
         assertThat(lista.hasMore()).isFalse();
+    }
+
+    @Test
+    void comDuracaoConfereAFichaPorqueOFiltroDoTmdbDeixaPassar() {
+        when(client.discover(eq(TitleType.MOVIE), anyMap()))
+                .thenReturn(new TmdbPage(1, 1, List.of(filme(1, "Curto"), filme(2, "Longo"), filme(3, "Sem duração"))));
+        // O TMDB devolveu o 2 num pedido de até 90 min, mas a ficha dele diz 102
+        when(titles.lookup(anyList())).thenReturn(List.of(ficha(1, 85), ficha(2, 102), ficha(3, null)));
+
+        var pedido = new DiscoverRequest(Criteria.empty().withRuntimeMax(90), List.of(8), SortBy.POPULARITY,
+                TitleType.MOVIE, 1);
+        TitleList lista = service.discover(pedido, 40);
+
+        assertThat(lista.items()).extracting(TitleSummary::title).containsExactly("Curto", "Sem duração");
+    }
+
+    @Test
+    void duracaoMinimaTambemEConferida() {
+        when(client.discover(eq(TitleType.MOVIE), anyMap()))
+                .thenReturn(new TmdbPage(1, 1, List.of(filme(1, "Épico"), filme(2, "Médio"))));
+        when(titles.lookup(anyList())).thenReturn(List.of(ficha(1, 169), ficha(2, 121)));
+
+        var pedido = new DiscoverRequest(Criteria.empty().withRuntimeMin(150), List.of(8), SortBy.POPULARITY,
+                TitleType.MOVIE, 1);
+
+        assertThat(service.discover(pedido, 40).items()).extracting(TitleSummary::title).containsExactly("Épico");
+    }
+
+    @Test
+    void semDuracaoNoPedidoNaoBuscaFichas() {
+        when(client.discover(eq(TitleType.MOVIE), anyMap()))
+                .thenReturn(new TmdbPage(1, 1, List.of(filme(1, "F1"))));
+
+        service.discover(pedido(TitleType.MOVIE, 1), 40);
+
+        verify(titles, never()).lookup(any());
+    }
+
+    @Test
+    void limiteDeDuracaoEExato() {
+        Criteria ate90 = Criteria.empty().withRuntimeMax(90);
+        assertThat(DiscoverService.runtimeFits(90, ate90)).isTrue();
+        assertThat(DiscoverService.runtimeFits(91, ate90)).isFalse();
+        assertThat(DiscoverService.runtimeFits(null, ate90)).isTrue();
+    }
+
+    private static TitleDetail ficha(int id, Integer duracao) {
+        return new TitleDetail(id, TitleType.MOVIE, "Filme " + id, "Filme " + id, 2020, "", null, List.of(), 7.0,
+                "en", duracao, null, null, null, List.of(), new WatchInfo(null, List.of()));
     }
 
     private static DiscoverRequest pedido(TitleType mediaType, int page) {
