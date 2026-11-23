@@ -23,7 +23,7 @@ import br.com.watchmatch.llm.model.Rerank.Pick;
 @Service
 public class RerankService {
 
-    static final String PROMPT_VERSION = "rerank.v2";
+    static final String PROMPT_VERSION = "rerank.v3";
 
     private static final int DEFAULT_LIMIT = 12;
     private static final int MAX_REASON = 200;
@@ -72,15 +72,31 @@ public class RerankService {
         return "Escolha " + limit + " títulos. Justificativa de até " + reasonLength(limit) + " caracteres.\n\n"
                 + summary
                 + Prompts.userBlock(request.text())
-                + "\n\nCandidatos (JSON):\n" + Prompts.JSON.writeValueAsString(request.candidates());
+                + "\n\nCandidatos:\n" + candidateLines(request.candidates());
+    }
+
+    // Uma linha por candidato em vez de JSON: sem aspas e nomes de campo repetidos, gasta bem menos tokens.
+    // O plano grátis do Groq aceita 8.000 tokens por minuto em cada modelo (docs/ARQUITETURA.md, "Resiliência")
+    static String candidateLines(List<Candidate> candidates) {
+        return candidates.stream()
+                .map(c -> c.mediaType() + ":" + c.id() + " | " + oneLine(c.title())
+                        + (c.year() != null ? " (" + c.year() + ")" : "")
+                        + " | " + (c.genres() == null ? "" : String.join(", ", c.genres()))
+                        + " | " + oneLine(c.overview()))
+                .collect(Collectors.joining("\n"));
+    }
+
+    // Quebra de linha ou "|" no texto do catálogo bagunçaria o formato de uma linha por candidato
+    private static String oneLine(String text) {
+        return text == null ? "" : text.replaceAll("\\s*[\\r\\n|]+\\s*", " ").trim();
     }
 
     // Mais títulos = justificativas mais curtas, para a resposta caber no limite de tokens do Groq gratuito
     static int reasonLength(int limit) {
         if (limit <= 12) {
-            return 150;
+            return 110;
         }
-        return limit <= 24 ? 110 : 80;
+        return limit <= 24 ? 90 : 70;
     }
 
     private Map<String, Object> schema(List<Candidate> candidates) {

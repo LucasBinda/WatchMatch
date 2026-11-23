@@ -81,6 +81,19 @@ paths:
           $ref: './common.yaml#/components/responses/BadRequest'
         '502':
           $ref: './common.yaml#/components/responses/UpstreamError'
+        '503':
+          description: |
+            O Groq recusou por limite de uso por minuto (429). A IA está no ar, só ocupada: o
+            recommendation-service segue sem ela e não conta isso como falha no circuito.
+          headers:
+            Retry-After:
+              description: Segundos até o Groq liberar de novo (quando o Groq informa)
+              schema:
+                type: integer
+          content:
+            application/problem+json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Problem'
 
   /rerank:
     post:
@@ -122,6 +135,19 @@ paths:
           $ref: './common.yaml#/components/responses/BadRequest'
         '502':
           $ref: './common.yaml#/components/responses/UpstreamError'
+        '503':
+          description: |
+            O Groq recusou por limite de uso por minuto (429). A IA está no ar, só ocupada: o
+            recommendation-service segue sem ela e não conta isso como falha no circuito.
+          headers:
+            Retry-After:
+              description: Segundos até o Groq liberar de novo (quando o Groq informa)
+              schema:
+                type: integer
+          content:
+            application/problem+json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Problem'
 
 components:
   schemas:

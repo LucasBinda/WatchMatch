@@ -4,12 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 import br.com.watchmatch.llm.service.IntentService;
@@ -69,6 +74,23 @@ class LlmControllerTest {
                 .exchange();
 
         assertThat(resposta).hasStatus(502);
+        assertThat(resposta).hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+    }
+
+    @Test
+    void groqNoLimiteDeTokensDevolve503ComRetryAfter() {
+        var headers = new HttpHeaders();
+        headers.set(HttpHeaders.RETRY_AFTER, "7.5");
+        when(rerankService.rerank(any())).thenThrow(HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS,
+                "Too Many Requests", headers, new byte[0], StandardCharsets.UTF_8));
+
+        var resposta = mvc.post().uri("/rerank")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"text\": \"x\", \"candidates\": [{\"id\": 1, \"mediaType\": \"movie\", \"title\": \"Um\"}]}")
+                .exchange();
+
+        assertThat(resposta).hasStatus(503);
+        assertThat(resposta).hasHeader(HttpHeaders.RETRY_AFTER, "8");
         assertThat(resposta).hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
     }
 
