@@ -227,7 +227,7 @@ repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 | Contrato | Schemathesis | cada serviço cumpre seu OpenAPI |
 | Ponta a ponta | Docker Compose + chamadas ao gateway | fluxo completo, incluindo fallback sem LLM |
 
-**Eval do componente de IA** (`backend/eval/`): 15–30 casos em `cases.json` com a frase e o esperado (plataforma, gênero, duração máxima). Roda contra o gateway, independente da linguagem dos serviços.
+**Eval do componente de IA** ([backend/eval/](../backend/eval/README.md)): 23 casos em `cases.json` com a frase e o esperado (16 normais e 7 difíceis: gíria, frase vaga, pedido impossível, prompt injection). Um script Python chama o gateway e confere o entendimento (critérios que a IA tirou da frase) e o resultado (cada título está na plataforma e respeita os critérios). Dá uma nota em vez de passar ou falhar; cada rodada fica salva em `backend/eval/results/`.
 
 | Métrica | Meta |
 | ------- | ---- |

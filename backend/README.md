@@ -24,4 +24,4 @@ e os títulos vêm na ordem do catálogo.
 
 ## Ainda falta
 
-- C3: feedback-service com Postgres, eval da IA (`backend/eval/`) e deploy.
+- C3: feedback-service com Postgres e deploy.
