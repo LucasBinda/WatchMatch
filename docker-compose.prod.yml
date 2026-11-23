@@ -1,0 +1,86 @@
+# Produção (docs/DEPLOY.md): soma-se ao docker-compose.yml.
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
+# ou só deploy/deploy.sh. O domínio vem de DOMAIN no arquivo .env da raiz (fora do Git).
+#
+# O que muda em relação ao de casa:
+#  - o Caddy fica na frente, com HTTPS automático (Let's Encrypt), e é o único com portas abertas (80 e 443);
+#  - o gateway deixa de abrir a 8080 e confia no IP real que o Caddy repassa (deploy/real-ip.conf);
+#  - cada container tem teto de memória, para os três Java caberem numa VM de 4 GB;
+#  - os logs giram (até 3 arquivos de 10 MB por container) para não encher o disco.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+# A JVM usa até 75% do teto do container (o padrão seria só 25%)
+x-java: &java
+  JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+
+services:
+  catalog-service:
+    environment:
+      <<: *java
+    mem_limit: 640m
+    logging: *logging
+    restart: always
+
+  llm-service:
+    environment:
+      <<: *java
+    mem_limit: 512m
+    logging: *logging
+    restart: always
+
+  recommendation-service:
+    environment:
+      <<: *java
+    mem_limit: 512m
+    logging: *logging
+    restart: always
+
+  frontend:
+    mem_limit: 64m
+    logging: *logging
+    restart: always
+
+  gateway:
+    # Sem porta para fora: só o Caddy fala com o gateway
+    ports: !reset []
+    volumes:
+      - ./deploy/real-ip.conf:/etc/nginx/conf.d/real-ip.conf:ro
+    mem_limit: 64m
+    logging: *logging
+    restart: always
+
+  caddy:
+    image: caddy:2.10-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: "${DOMAIN:?Defina DOMAIN no arquivo .env da raiz, por exemplo DOMAIN=watchmatch.duckdns.org}"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificados: sem o volume, cada reinício pediria um novo ao Let's Encrypt (que tem limite)
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      gateway:
+        condition: service_healthy
+    mem_limit: 128m
+    logging: *logging
+    restart: always
+
+# Faixa fixa da rede interna: o gateway só aceita X-Forwarded-For vindo daqui (deploy/real-ip.conf)
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  caddy_data:
+  caddy_config:

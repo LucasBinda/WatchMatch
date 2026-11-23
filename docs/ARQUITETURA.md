@@ -204,8 +204,8 @@ inteira atrás do mesmo Wi-Fi); por custo em tokens, com Bucket4j (mais justo, m
 cota diária por IP (exige Redis ou Postgres). Abaixo do gateway há ainda o limite **suave** do recommendation-service (seção 4, "Resiliência"): quando o
 Groq ou as fichas apertam, a busca cai para o modo `filters` em vez de falhar.
 
-No deploy atrás de um proxy (Render, Railway), o Nginx precisa do `real_ip` para enxergar o IP do usuário;
-o trecho está comentado no `nginx.conf`.
+No deploy, o Caddy fica na frente com o HTTPS, e o gateway usa o IP real que ele repassa (`deploy/real-ip.conf`,
+ver [DEPLOY.md](DEPLOY.md)).
 
 ## 6. Estrutura do repositório
 
@@ -269,7 +269,7 @@ repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 
 **Roteiro do vídeo:** problema → arquitetura (diagrama) → 3 buscas ao vivo → critérios interpretados → derrubar o llm-service e mostrar o fallback → eval rodando.
 
-**Fica para o C3:** feedback-service + Postgres, deploy na nuvem (avaliar free tier com vários serviços vs. VM rodando o Compose), Playwright, Watchmode, PWA, possível reescrita de um serviço em outra linguagem (ex.: catalog-service em C++).
+**Fica para o C3:** feedback-service + Postgres, Playwright, Watchmode, PWA, possível reescrita de um serviço em outra linguagem (ex.: catalog-service em C++).
 
 ## 10. Pendências
 
