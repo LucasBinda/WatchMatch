@@ -15,7 +15,8 @@ export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null)
   const [form, setForm] = useState<SearchForm>({
     query: '',
-    genre: '',
+    genres: [],
+    genreMatch: 'all',
     runtimeMax: '',
     mediaType: '',
     providers: loadProviders(),

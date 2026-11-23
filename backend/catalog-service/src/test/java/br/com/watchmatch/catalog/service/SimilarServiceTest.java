@@ -102,6 +102,19 @@ class SimilarServiceTest {
     }
 
     @Test
+    void comTodosOsGenerosARecomendacaoPrecisaTerCadaUm() {
+        // O 1 é só ficção científica; o 3 é ficção científica e aventura
+        when(titles.lookup(anyList())).thenReturn(List.of(
+                detalhe(1, NETFLIX, "flatrate", 100),
+                detalheComGeneros(3, List.of(new Genre(878, "Ficção científica"), new Genre(12, "Aventura")))));
+
+        var criterios = Criteria.empty().withGenres(List.of(878, 12)).withGenreMatch("all");
+        SimilarResult resultado = service.similar(pedido(criterios), 40);
+
+        assertThat(resultado.items()).extracting(TitleSummary::id).startsWith(3).doesNotContain(1);
+    }
+
+    @Test
     void generoEscolhidoPeloUsuarioVenceOsDaReferencia() {
         when(titles.lookup(anyList())).thenReturn(List.of());
 
@@ -161,6 +174,12 @@ class SimilarServiceTest {
 
     private static TmdbResult resultado(int id) {
         return new TmdbResult(id, "Filme " + id, null, null, null, "", null, "2015-01-01", null, 7.0, List.of(), "en");
+    }
+
+    private static TitleDetail detalheComGeneros(int id, List<Genre> generos) {
+        return new TitleDetail(id, TitleType.MOVIE, "Filme " + id, "Filme " + id, 2015, "", null, generos, 7.0, "en",
+                100, null, "12", null, List.of(), new WatchInfo(null, List.of(new WatchProvider(NETFLIX, "P", null,
+                        "flatrate", null))));
     }
 
     private static TitleDetail detalhe(int id, int plataforma, String oferta, int duracao) {

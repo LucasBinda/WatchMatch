@@ -25,6 +25,7 @@ public record SimilarBody(
         @Pattern(regexp = "[a-z]{2}", message = "deve ser um código ISO 639-1, como ko") String originalLanguage,
         String certificationMax,
         @Size(max = 5) List<String> keywords,
+        @Pattern(regexp = "all|any", message = "deve ser all ou any") String genreMatch,
         @NotEmpty List<Integer> providers,
         @Min(1) @Max(60) Integer limit,
         @Min(1) @Max(500) Integer page) {
@@ -33,7 +34,7 @@ public record SimilarBody(
 
     public SimilarRequest toDomain() {
         var criteria = new Criteria(genres, excludeGenres, runtimeMin, runtimeMax, yearFrom, yearTo,
-                originalLanguage, certificationMax, keywords);
+                originalLanguage, certificationMax, keywords, genreMatch);
         return new SimilarRequest(title, mediaType, criteria, providers, page);
     }
 

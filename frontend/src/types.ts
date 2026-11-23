@@ -4,6 +4,9 @@ export type MediaType = 'movie' | 'tv'
 
 export type Certification = 'L' | '10' | '12' | '14' | '16' | '18'
 
+// all: o título precisa ter todos os gêneros · any: basta um deles
+export type GenreMatch = 'all' | 'any'
+
 export interface Genre {
   id: number
   name: string
@@ -23,6 +26,7 @@ export interface WatchProvider extends Provider {
 export interface Criteria {
   mediaType?: MediaType
   genres?: number[]
+  genreMatch?: GenreMatch
   excludeGenres?: number[]
   runtimeMin?: number
   runtimeMax?: number

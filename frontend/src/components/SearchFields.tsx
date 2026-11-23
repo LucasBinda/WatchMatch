@@ -1,8 +1,9 @@
 import { ArrowRight, LoaderCircle } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
+import { GenrePicker } from './GenrePicker'
 import { PlatformPicker } from './PlatformPicker'
 import { SelectField } from './SelectField'
-import { AI_MODE_OPTIONS, MEDIA_OPTIONS, genresFor, runtimeOptions, setField, type SearchForm } from '../lib/searchForm'
+import { AI_MODE_OPTIONS, MEDIA_OPTIONS, genresFor, runtimeOptions, setField, setGenres, type SearchForm } from '../lib/searchForm'
 import type { Meta } from '../types'
 
 const MAX_QUERY = 500
@@ -62,16 +63,12 @@ export function SearchFields({ meta, form, onChange, wide = false, autoFocus = f
       </div>
 
       <div className={wide ? 'grid gap-4 sm:grid-cols-3' : 'space-y-5'}>
-        <SelectField
-          id="genre"
-          label="Gênero"
-          value={form.genre}
-          ai={ai('genre')}
-          onChange={(v) => onChange(setField(form, 'genre', v))}
-          options={[
-            { value: '', label: 'Qualquer gênero' },
-            ...genres.map((g) => ({ value: String(g.id), label: g.name })),
-          ]}
+        <GenrePicker
+          genres={genres}
+          selected={form.genres}
+          match={form.genreMatch}
+          ai={ai('genres')}
+          onChange={(selected, match) => onChange(setGenres(form, selected, match))}
         />
         <SelectField
           id="runtime"

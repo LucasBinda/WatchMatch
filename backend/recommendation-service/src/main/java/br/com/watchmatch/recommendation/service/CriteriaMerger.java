@@ -35,9 +35,20 @@ public class CriteriaMerger {
                 pick("yearTo", f.yearTo(), ai.yearTo(), sources),
                 pick("originalLanguage", f.originalLanguage(), ai.originalLanguage(), sources),
                 pick("certificationMax", f.certificationMax(), ai.certificationMax(), sources),
-                pick("keywords", f.keywords(), ai.keywords(), sources));
+                pick("keywords", f.keywords(), ai.keywords(), sources),
+                genreMatch(f, sources));
 
         return new MergedCriteria(merged, providers(intent, userProviders, sources), sources);
+    }
+
+    // "Todos os gêneros" só vale para os gêneros que o usuário marcou na tela. Os da IA são sempre
+    // "qualquer um": "comédia romântica leve" vira comédia ou romance, e exigir os dois zeraria a busca
+    private String genreMatch(Criteria filters, Map<String, String> sources) {
+        if (!"filter".equals(sources.get("genres")) || !"all".equals(filters.genreMatch())) {
+            return null;
+        }
+        sources.put("genreMatch", "filter");
+        return "all";
     }
 
     // "Quero algo na Netflix": a IA cita plataformas; vale só as que o usuário assina

@@ -52,6 +52,25 @@ class DiscoverQueryBuilderTest {
     }
 
     @Test
+    void todosOsGenerosMarcadosNaTelaViramE() {
+        // Faroeste E ficção científica: no TMDB a vírgula exige todos, a barra aceita qualquer um
+        var criteria = Criteria.empty().withGenres(List.of(37, 878)).withGenreMatch("all");
+
+        Map<String, String> params = builder.build(new DiscoverRequest(criteria, List.of(8)), TitleType.MOVIE);
+
+        assertThat(params).containsEntry("with_genres", "37,878");
+    }
+
+    @Test
+    void qualquerUmContinuaComOPadrao() {
+        var criteria = Criteria.empty().withGenres(List.of(37, 878)).withGenreMatch("any");
+
+        Map<String, String> params = builder.build(new DiscoverRequest(criteria, List.of(8)), TitleType.MOVIE);
+
+        assertThat(params).containsEntry("with_genres", "37|878");
+    }
+
+    @Test
     void duracaoMaximaEmMinutos() {
         var criteria = Criteria.empty().withRuntimeMax(120);
         var request = new DiscoverRequest(criteria, List.of(8));

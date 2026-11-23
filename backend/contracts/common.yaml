@@ -131,9 +131,17 @@ components:
           $ref: '#/components/schemas/MediaType'
         genres:
           type: array
-          description: Ids de gênero que o título deve ter (qualquer um deles)
+          description: Ids de gênero que o título deve ter (qualquer um deles, ou todos com `genreMatch=all`)
           items:
             type: integer
+        genreMatch:
+          type: string
+          enum: [all, any]
+          default: any
+          description: |
+            `all`: o título precisa ter todos os gêneros de `genres` (faroeste E ficção científica).
+            `any`: basta um deles. Só os gêneros marcados na tela aceitam `all`; os que a IA entende
+            são sempre `any` ("comédia romântica" vira comédia ou romance).
         excludeGenres:
           type: array
           description: Ids de gênero proibidos

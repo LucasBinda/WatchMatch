@@ -22,8 +22,12 @@ public class DiscoverQueryBuilder {
 
         Criteria criteria = request.criteria();
 
+        // No TMDB, "," = todos os gêneros e "|" = qualquer um. A IA sempre usa "qualquer um": "comédia
+        // romântica leve" vira comédia ou romance. "Todos" só quando o usuário marca na tela
         if (!criteria.genres().isEmpty()) {
-            params.put("with_genres", joinWithPipe(criteria.genres()));
+            params.put("with_genres", criteria.allGenres()
+                    ? criteria.genres().stream().map(String::valueOf).collect(Collectors.joining(","))
+                    : joinWithPipe(criteria.genres()));
         }
 
         if (!criteria.excludeGenres().isEmpty()) {

@@ -83,7 +83,8 @@ public class SimilarService {
         // Filme e série têm ids de gênero diferentes no TMDB (ficção científica: 878 e 10765): com tipos
         // diferentes ("série parecida com Interestelar") a semelhança vem só das palavras-chave, que são as mesmas
         boolean useRefGenres = criteria.genres().isEmpty() && targetType == refType;
-        Criteria fillCriteria = useRefGenres ? criteria.withGenres(ref.genreIds()) : criteria;
+        // Os gêneros de X valem como "qualquer um": exigir todos deixaria quase só o próprio X
+        Criteria fillCriteria = useRefGenres ? criteria.withGenres(ref.genreIds()).withGenreMatch(null) : criteria;
         List<Integer> refKeywords = ref.keywordIds().stream().limit(MAX_REFERENCE_KEYWORDS).toList();
         TitleList fill = discover.discover(
                 new DiscoverRequest(fillCriteria, request.providers(), SortBy.POPULARITY, targetType, page),
@@ -145,7 +146,8 @@ public class SimilarService {
         if (genreIds.stream().anyMatch(c.excludeGenres()::contains)) {
             return false;
         }
-        if (!c.genres().isEmpty() && genreIds.stream().noneMatch(c.genres()::contains)) {
+        if (!c.genres().isEmpty() && (c.allGenres() ? !genreIds.containsAll(c.genres())
+                : genreIds.stream().noneMatch(c.genres()::contains))) {
             return false;
         }
         return certificationAllowed(d.certification(), c.certificationMax());

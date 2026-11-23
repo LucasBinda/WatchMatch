@@ -52,6 +52,37 @@ class CriteriaMergerTest {
     }
 
     @Test
+    void todosOsGenerosMarcadosNaTelaSeguemParaOCatalogo() {
+        var filtros = new Criteria(null, List.of(37, 878), null, null, null, null, null, null, null, null, "all");
+
+        var resultado = merger.merge(filtros, null, List.of(8));
+
+        assertThat(resultado.criteria().genres()).containsExactly(37, 878);
+        assertThat(resultado.criteria().genreMatch()).isEqualTo("all");
+        assertThat(resultado.sources()).containsEntry("genreMatch", "filter");
+    }
+
+    @Test
+    void generosDaIaSaoSempreQualquerUm() {
+        // "all" sem gênero marcado na tela não pode valer para os gêneros que a IA escolheu
+        var filtros = new Criteria(null, null, null, null, null, null, null, null, null, null, "all");
+        var ia = intent(new Criteria(null, List.of(35, 10749), null, null, null, null, null, null, null, null),
+                List.of());
+
+        var resultado = merger.merge(filtros, ia, List.of(8));
+
+        assertThat(resultado.criteria().genres()).containsExactly(35, 10749);
+        assertThat(resultado.criteria().genreMatch()).isNull();
+    }
+
+    @Test
+    void valorDesconhecidoDeGenreMatchViraQualquerUm() {
+        var filtros = new Criteria(null, List.of(37, 878), null, null, null, null, null, null, null, null, "alguns");
+
+        assertThat(merger.merge(filtros, null, List.of(8)).criteria().genreMatch()).isNull();
+    }
+
+    @Test
     void generoPedidoNaTelaNuncaFicaProibidoPelaIa() {
         var filtros = new Criteria(null, List.of(27), null, null, null, null, null, null, null, null);
         var ia = intent(new Criteria(null, null, List.of(27, 99), null, null, null, null, null, null, null), List.of());

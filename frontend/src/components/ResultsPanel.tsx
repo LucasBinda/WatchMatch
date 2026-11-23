@@ -67,6 +67,16 @@ export function ResultsPanel({
               {n}
             </Notice>
           ))}
+          {/* O backend já avisa quando não acha nada; este é a reserva, com uma dica quando o filtro de
+              gêneros exigia todos de uma vez */}
+          {count === 0 && result.notices.length === 0 && (
+            <Notice icon={Info}>Nenhum conteúdo encontrado com esses filtros.</Notice>
+          )}
+          {count === 0 && result.criteria.genreMatch === 'all' && (result.criteria.genres?.length ?? 0) > 1 && (
+            <Notice icon={Info}>
+              Poucos títulos têm todos esses gêneros juntos. Tente "Qualquer um" no campo Gênero ou desmarque algum.
+            </Notice>
+          )}
         </div>
       )}
 

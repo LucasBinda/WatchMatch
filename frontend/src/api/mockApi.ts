@@ -38,7 +38,13 @@ export function recommend(request: RecommendRequest): Promise<RecommendResponse>
     .filter((t) => t.watch.providers.some((p) => wanted.has(p.id)))
     .filter((t) => !filters.mediaType || t.mediaType === filters.mediaType)
     .filter((t) => !filters.runtimeMax || t.mediaType === 'tv' || (t.runtime ?? 0) <= filters.runtimeMax)
-    .filter((t) => !filters.genres?.length || t.genres?.some((g) => filters.genres!.includes(g.id)))
+    .filter((t) => {
+      if (!filters.genres?.length) return true
+      const ids = (t.genres ?? []).map((g) => g.id)
+      return filters.genreMatch === 'all'
+        ? filters.genres.every((g) => ids.includes(g))
+        : filters.genres.some((g) => ids.includes(g))
+    })
 
   const items = matches
     .slice((page - 1) * limit, page * limit)

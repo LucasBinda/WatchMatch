@@ -64,6 +64,30 @@ class DiscoverControllerTest {
     }
 
     @Test
+    void genreMatchChegaAoServico() {
+        when(service.discover(any(), anyInt())).thenReturn(new TitleList(List.of(), false));
+
+        mvc.post().uri("/discover")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"providers\": [8], \"genres\": [37, 878], \"genreMatch\": \"all\"}")
+                .exchange();
+
+        var pedido = ArgumentCaptor.forClass(DiscoverRequest.class);
+        verify(service).discover(pedido.capture(), anyInt());
+        assertThat(pedido.getValue().criteria().allGenres()).isTrue();
+    }
+
+    @Test
+    void genreMatchInvalidoDevolve400() {
+        var resposta = mvc.post().uri("/discover")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"providers\": [8], \"genres\": [37], \"genreMatch\": \"alguns\"}")
+                .exchange();
+
+        assertThat(resposta).hasStatus(400);
+    }
+
+    @Test
     void respostaSaiNoFormatoDoContrato() {
         var interestelar = new TitleSummary(157336, TitleType.MOVIE, "Interestelar", "Interstellar", 2014,
                 "Uma equipe...", "https://image.tmdb.org/t/p/w500/abc.jpg",
