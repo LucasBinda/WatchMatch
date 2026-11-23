@@ -136,19 +136,29 @@ justificativas**, `degraded: true` e um aviso em `notices` dizendo o motivo (deg
 | Peça | Como funciona |
 | ---- | ------------- |
 | Timeout | 2 s para conectar; 40 s de leitura no llm-service (48 justificativas levam tempo) |
-| Circuit breaker, um para o `/intent` e outro para o `/rerank` | Abre com 50% de falha nas últimas 10 chamadas (mínimo 4). Fica aberto 30 s: a busca nem tenta a IA e responde na hora. Depois deixa passar 2 chamadas de teste; deram certo, fecha. Contam como falha: 5xx (o llm-service devolve 502 quando o Groq falha ou estoura a cota), timeout e erro de conexão. Erro 4xx não conta, porque é bug do nosso pedido |
-| Limite suave do `/rerank` | 8 fichas por minuto no site, cobradas pelo tamanho da página: 12 títulos = 1 ficha, 24 = 2, 36 = 3, 48 = 4. Sem ficha, a busca não falha: vem na ordem do catálogo. Acompanha os 8k tokens/min do Groq gratuito |
+| Circuit breaker, um para o `/intent` e outro para o `/rerank` | Abre com 50% de falha nas últimas 10 chamadas (mínimo 4). Fica aberto 30 s: a busca nem tenta a IA e responde na hora. Depois deixa passar 2 chamadas de teste; deram certo, fecha. Contam como falha: 502 (o Groq falhou), timeout e erro de conexão. Não contam: 4xx, que é bug do nosso pedido, e 503, que é o Groq no limite de uso (veja abaixo) |
+| Limite suave do `/rerank` | 4 fichas por minuto no site, cobradas pelo tamanho da página: 12 títulos = 1 ficha, 24 = 2, 36 = 3, 48 = 4. Sem ficha, a busca não falha: vem na ordem do catálogo |
+| Groq no limite de uso | O Groq recusa com 429; o llm-service devolve 503 com `Retry-After`. O recommendation-service trata como "ocupado": mesmo aviso do limite suave, sem contar falha no circuito |
 
 Os circuitos são separados porque o `/rerank` é o que pesa. Se só ele cair, a IA ainda entende o pedido e a
 busca vira o modo `filters`. Os números são ajustáveis por variável de ambiente (`AI_CIRCUIT_OPEN_FOR`,
 `AI_RERANK_PERMITS` etc., ver `AiGuardConfig`). Os contadores ficam na memória do serviço.
+
+**Cota do Groq.** No plano grátis, cada modelo aceita 8.000 tokens por minuto e 1.000 pedidos por dia (lido
+nos cabeçalhos `x-ratelimit-*`; os 4 modelos disponíveis têm limites parecidos, então trocar de modelo não
+resolve). O eval mostrou que o rerank gastava ~4.000 tokens por busca, ou seja, só ~2 buscas por minuto
+com a IA escolhendo. O `rerank.v3` manda os candidatos em uma linha cada, em vez de JSON, com 24
+candidatos e sinopses de até 140 caracteres numa página de 12 títulos, e pede justificativas de até 110
+caracteres. Isso dá ~2.000 tokens, ou umas 4 buscas por minuto, que é o limite suave. Num plano pago, basta
+subir `AI_RERANK_PERMITS`.
 
 | Situação | Aviso para o usuário |
 | -------- | -------------------- |
 | `/intent` falhou | "A IA não respondeu desta vez: a busca usou só os filtros da tela." |
 | Circuito do `/intent` aberto | "A IA está fora do ar por alguns instantes: a busca usou só os filtros da tela." |
 | `/rerank` falhou ou circuito aberto | "…os títulos vieram na ordem do catálogo, sem justificativa." |
-| Sem fichas do limite suave | "Muita gente buscando agora: a IA entendeu o pedido, mas os títulos vieram na ordem do catálogo…" |
+| Sem fichas do limite suave, ou Groq no limite no `/rerank` | "Muita gente buscando agora: a IA entendeu o pedido, mas os títulos vieram na ordem do catálogo…" |
+| Groq no limite no `/intent` | "Muita gente buscando agora: a busca usou só os filtros da tela." |
 
 **Demonstração do vídeo:** `docker compose stop llm-service`. As primeiras buscas (até 4) tentam a IA e falham, e a partir
 daí o circuito abre e as buscas respondem em menos de 1 s, sem IA. Depois `docker compose start llm-service`;
@@ -171,6 +181,10 @@ Responsabilidades centralizadas no gateway: `limit_req` (protege o free tier do 
 (16 KB) e `X-Request-Id` (`$request_id` do Nginx). CORS não é preciso: site e API saem da mesma origem. Rotas
 internas (`/discover`, `/titles/lookup`, o llm-service) respondem 404 para fora. Configuração em
 `backend/gateway/nginx.conf`.
+
+Os nomes dos serviços são resolvidos pelo DNS do Docker (`resolver 127.0.0.11`) a cada 10 s, com variáveis no
+`proxy_pass`. Com o nome fixo, o Nginx guardava o IP da partida, e recriar um container dava 502 até o gateway ser
+reiniciado.
 
 ### Rate limit
 

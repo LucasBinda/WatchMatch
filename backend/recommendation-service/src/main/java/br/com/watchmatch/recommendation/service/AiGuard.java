@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
@@ -19,6 +20,8 @@ import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 //    a IA ainda entende o pedido e a busca vira o modo "filters";
 //  - um limite suave no /rerank, em fichas por minuto para o site todo, cobradas pelo tamanho da página
 //    (12 títulos = 1 ficha, 48 = 4). Sem ficha, a busca não falha: vem na ordem do catálogo.
+//  - 503 do llm-service = o Groq recusou por limite de uso (429). A IA está no ar, só ocupada: vira BUSY,
+//    como o limite suave, e não conta para abrir o circuito.
 public class AiGuard {
 
     private static final Logger log = LoggerFactory.getLogger(AiGuard.class);
@@ -28,7 +31,7 @@ public class AiGuard {
     public enum Reason {
         // Circuito aberto: a IA falhou muito há pouco
         PAUSED,
-        // Limite suave: acabaram as fichas do minuto
+        // Limite suave sem fichas, ou o Groq no limite de uso por minuto
         BUSY
     }
 
@@ -55,7 +58,8 @@ public class AiGuard {
             int rerankPermits, Duration permitRefresh) {
 
         public static final Settings DEFAULTS =
-                new Settings(10, 4, 50, Duration.ofSeconds(30), 2, 8, Duration.ofMinutes(1));
+                new Settings(10, 4, 50, Duration.ofSeconds(30), 2, 4, Duration.ofMinutes(1));
+        // 4 fichas: o rerank de uma página de 12 gasta ~2.000 tokens e o Groq grátis aceita 8.000 por minuto
     }
 
     private final CircuitBreaker intentBreaker;
@@ -123,6 +127,14 @@ public class AiGuard {
             T result = call.get();
             breaker.onSuccess(System.nanoTime() - start, TimeUnit.NANOSECONDS);
             return result;
+        } catch (HttpServerErrorException e) {
+            if (e.getStatusCode().value() == 503) {
+                // Não é falha nem sucesso: devolve a vaga do circuito sem registrar nada
+                breaker.releasePermission();
+                throw new AiUnavailableException(Reason.BUSY);
+            }
+            breaker.onError(System.nanoTime() - start, TimeUnit.NANOSECONDS, e);
+            throw e;
         } catch (RuntimeException e) {
             breaker.onError(System.nanoTime() - start, TimeUnit.NANOSECONDS, e);
             throw e;

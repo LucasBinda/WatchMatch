@@ -13,7 +13,8 @@ info:
     `/titles/lookup` para enriquecer os itens finais.
 
     Degradação: se o llm-service falhar, estiver com o circuito aberto ou o limite suave do /rerank
-    acabar (8 fichas/min no site; 12 títulos = 1 ficha, 48 = 4), responde com os candidatos do catálogo
+    acabar (4 fichas/min no site; 12 títulos = 1 ficha, 48 = 4) ou o Groq estiver no limite de uso
+    (503 do llm-service), responde com os candidatos do catálogo
     sem justificativas, `degraded: true` e um aviso em `notices` dizendo o motivo.
 servers:
   - url: http://recommendation-service:8080

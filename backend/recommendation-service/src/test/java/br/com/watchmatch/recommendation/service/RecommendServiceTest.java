@@ -19,6 +19,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreaker.State;
 import br.com.watchmatch.recommendation.client.CatalogClient;
 import br.com.watchmatch.recommendation.client.LlmClient;
 import br.com.watchmatch.recommendation.model.AiMode;
@@ -53,9 +54,9 @@ class RecommendServiceTest {
 
     private final CatalogClient catalog = mock(CatalogClient.class);
     private final LlmClient llm = mock(LlmClient.class);
+    private final AiGuard guard = new AiGuard(AiGuard.Settings.DEFAULTS);
     private final RecommendService service =
-            new RecommendService(catalog, llm, new TextSanitizer(), new CriteriaMerger(),
-                    new AiGuard(AiGuard.Settings.DEFAULTS));
+            new RecommendService(catalog, llm, new TextSanitizer(), new CriteriaMerger(), guard);
 
     @BeforeEach
     void catalogo() {
@@ -188,16 +189,42 @@ class RecommendServiceTest {
     }
 
     @Test
+    void groqNoLimiteDeUsoViraOcupadoENaoAbreOCircuito() {
+        when(llm.intent(any())).thenReturn(intent(Criteria.empty()));
+        // O llm-service devolve 503 quando o Groq recusa por limite de tokens (429)
+        when(llm.rerank(any())).thenThrow(new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE));
+
+        RecommendResponse resposta = null;
+        for (int i = 0; i < 4; i++) {
+            resposta = service.recommend(pedido("comédia leve", 2), "req-" + i);
+        }
+
+        verify(llm, times(4)).rerank(any());
+        assertThat(resposta.notices()).containsExactly(RecommendService.PICK_BUSY);
+        // Com 502 o circuito abriria aqui (4 falhas); recusa por limite de uso não conta
+        assertThat(guard.rerankState()).isEqualTo(State.CLOSED);
+    }
+
+    @Test
+    void groqNoLimiteNoIntentAvisaQueEstaOcupado() {
+        when(llm.intent(any())).thenThrow(new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE));
+
+        RecommendResponse resposta = service.recommend(pedido("comédia leve", 2), "req-1");
+
+        assertThat(resposta.degraded()).isTrue();
+        assertThat(resposta.notices()).containsExactly(RecommendService.INTENT_BUSY);
+    }
+
+    @Test
     void semFichasDoLimiteSuaveABuscaVemSemAsEscolhasDaIa() {
         when(llm.intent(any())).thenReturn(intent(Criteria.empty()));
         when(llm.rerank(any())).thenReturn(new RerankResponse(List.of(new Pick(3, "movie", "Bom")), 0));
 
-        // 8 fichas por minuto; 48 títulos custam 4: duas buscas passam, a terceira fica sem IA
+        // 4 fichas por minuto; 48 títulos custam 4: a primeira busca passa, a segunda fica sem IA
         service.recommend(pedido("comédia leve", 48), "req-1");
-        service.recommend(pedido("comédia leve", 48), "req-2");
-        RecommendResponse resposta = service.recommend(pedido("comédia leve", 48), "req-3");
+        RecommendResponse resposta = service.recommend(pedido("comédia leve", 48), "req-2");
 
-        verify(llm, times(2)).rerank(any());
+        verify(llm, times(1)).rerank(any());
         assertThat(resposta.degraded()).isTrue();
         assertThat(resposta.notices()).containsExactly(RecommendService.PICK_BUSY);
         assertThat(resposta.items()).extracting(Recommendation::title).containsExactly("Um", "Dois", "Três");
@@ -309,7 +336,7 @@ class RecommendServiceTest {
 
     @Test
     void candidatosDaIaCrescemComAPagina() {
-        assertThat(RecommendService.rerankPool(12)).isEqualTo(30);
+        assertThat(RecommendService.rerankPool(12)).isEqualTo(24);
         assertThat(RecommendService.rerankPool(24)).isEqualTo(36);
         assertThat(RecommendService.rerankPool(36)).isEqualTo(48);
         assertThat(RecommendService.rerankPool(48)).isEqualTo(60);
@@ -326,7 +353,7 @@ class RecommendServiceTest {
 
         var rerank = ArgumentCaptor.forClass(RerankRequest.class);
         verify(llm).rerank(rerank.capture());
-        assertThat(rerank.getValue().candidates().get(0).overview()).hasSizeLessThanOrEqualTo(300);
+        assertThat(rerank.getValue().candidates().get(0).overview()).hasSizeLessThanOrEqualTo(140);
     }
 
     @Test

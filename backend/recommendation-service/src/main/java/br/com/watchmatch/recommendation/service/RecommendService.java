@@ -55,13 +55,13 @@ public class RecommendService {
     private static final int CATALOG_LIMIT = 40;
     private static final int TMDB_PAGE_SIZE = 20;
     // A IA escolhe entre a página pedida e mais uma folga, até 60 candidatos (máximo do /rerank)
-    private static final int RERANK_MIN_CANDIDATES = 30;
+    private static final int RERANK_MIN_CANDIDATES = 24;
     private static final int RERANK_EXTRA = 12;
     private static final int RERANK_MAX_CANDIDATES = 60;
     // Total de caracteres de sinopse enviados à IA, dividido entre os candidatos.
     // Mantém o pedido dentro do limite de tokens por minuto do Groq gratuito (8k) até com 48 títulos.
-    private static final int OVERVIEW_BUDGET = 9000;
-    static final int OVERVIEW_MAX = 300;
+    private static final int OVERVIEW_BUDGET = 3400;
+    static final int OVERVIEW_MAX = 140;
 
     static final String OFF_TOPIC = "Não entendi isso como um pedido de filme ou série; mostrando títulos populares.";
     static final String RELAXED = "Não achei nada com tudo o que entendi do pedido; mostrando resultados só com os seus filtros.";
@@ -71,6 +71,7 @@ public class RecommendService {
     // Quando a IA fica de fora: um aviso por motivo (o frontend mostra no lugar do aviso genérico)
     static final String INTENT_FAILED = "A IA não respondeu desta vez: a busca usou só os filtros da tela.";
     static final String INTENT_PAUSED = "A IA está fora do ar por alguns instantes: a busca usou só os filtros da tela.";
+    static final String INTENT_BUSY = "Muita gente buscando agora: a busca usou só os filtros da tela.";
     static final String PICK_FAILED = "A IA não conseguiu escolher desta vez: os títulos vieram na ordem do catálogo, sem justificativa.";
     static final String PICK_PAUSED = "A IA está fora do ar por alguns instantes: os títulos vieram na ordem do catálogo, sem justificativa.";
     static final String PICK_BUSY = "Muita gente buscando agora: a IA entendeu o pedido, mas os títulos vieram na ordem do catálogo, sem justificativa.";
@@ -106,8 +107,9 @@ public class RecommendService {
                 IntentRequest intentRequest = intentRequest(text);
                 intent = guard.intent(() -> llm.intent(intentRequest));
             } catch (AiUnavailableException e) {
-                log.info("/intent não chamado: circuito aberto");
-                notices.add(INTENT_PAUSED);
+                boolean busy = e.reason() == AiGuard.Reason.BUSY;
+                log.info("/intent sem IA: {}", busy ? "Groq no limite de uso" : "circuito aberto");
+                notices.add(busy ? INTENT_BUSY : INTENT_PAUSED);
                 degraded = true;
             } catch (RestClientException e) {
                 log.warn("llm-service /intent falhou: {}", e.getMessage());
@@ -174,7 +176,7 @@ public class RecommendService {
                 picks = pickWithAi(text, intent, candidates, limit);
             } catch (AiUnavailableException e) {
                 boolean busy = e.reason() == AiGuard.Reason.BUSY;
-                log.info("/rerank não chamado: {}", busy ? "limite suave" : "circuito aberto");
+                log.info("/rerank sem IA: {}", busy ? "limite suave ou Groq no limite de uso" : "circuito aberto");
                 notices.add(busy ? PICK_BUSY : PICK_PAUSED);
                 degraded = true;
             } catch (RestClientException e) {
@@ -345,7 +347,7 @@ public class RecommendService {
         return list == null || list.items() == null || list.items().isEmpty();
     }
 
-    // Mais candidatos = sinopses mais curtas: 30 → 300 caracteres, 60 → 150
+    // Mais candidatos = sinopses mais curtas: 24 → 140 caracteres, 60 → 56. Cabe no limite de tokens do Groq
     private List<Candidate> toCandidates(List<TitleSummary> titles, int pool) {
         int overviewMax = Math.min(OVERVIEW_MAX, OVERVIEW_BUDGET / pool);
         return titles.stream()
