@@ -34,9 +34,10 @@ CERTIFICATIONS = ["L", "10", "12", "14", "16", "18"]
 OFF_TOPIC = "Não entendi isso como um pedido de filme ou série"
 RELAXED_ALL = "mostrando resultados só com os seus filtros"
 RELAXED_PARTIAL = "deixei de lado: "
-INTENT_DOWN = ("A IA não respondeu desta vez", "A IA está fora do ar por alguns instantes: a busca")
+INTENT_DOWN = ("A IA não respondeu desta vez", "A IA está fora do ar por alguns instantes: a busca",
+               "Muita gente buscando agora: a busca")
 PICK_DOWN = ("A IA não conseguiu escolher", "A IA está fora do ar por alguns instantes: os títulos",
-             "Muita gente buscando agora")
+             "Muita gente buscando agora: a IA entendeu")
 # Nome que aparece no aviso de afrouxamento → campo dos critérios
 DROPPED_FIELDS = {"palavras-chave": "keywords", "idioma": "originalLanguage", "duração mínima": "runtimeMin"}
 AI_FIELDS = ["mediaType", "genres", "excludeGenres", "runtimeMin", "runtimeMax", "yearFrom", "yearTo",
