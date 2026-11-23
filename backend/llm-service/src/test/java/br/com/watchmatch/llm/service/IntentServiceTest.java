@@ -30,7 +30,7 @@ class IntentServiceTest {
     private static final String MODELO = "openai/gpt-oss-20b";
 
     private final GroqClient groq = mock(GroqClient.class);
-    private final IntentService service = new IntentService(groq, new PromptLoader(), MODELO);
+    private final IntentService service = new IntentService(groq, new PromptLoader(), MODELO, "intent.v3");
 
     private final Intent.Request pedido = new Intent.Request(
             "comédia leve na Netflix, até 2h, nada de terror",
@@ -56,7 +56,7 @@ class IntentServiceTest {
         assertThat(resposta.providers()).containsExactly(8);
         assertThat(resposta.summary()).isEqualTo("Comédia leve, até 2h");
         assertThat(resposta.meta().model()).isEqualTo(MODELO);
-        assertThat(resposta.meta().promptVersion()).isEqualTo("intent.v2");
+        assertThat(resposta.meta().promptVersion()).isEqualTo("intent.v3");
         assertThat(resposta.meta().totalTokens()).isEqualTo(500);
     }
 
@@ -160,6 +160,27 @@ class IntentServiceTest {
         responde("isso não é json");
 
         assertThatThrownBy(() -> service.interpret(pedido)).isInstanceOf(LlmOutputException.class);
+    }
+
+    @Test
+    void versaoDoPromptEscolhidaPelaConfiguracao() {
+        var v2 = new IntentService(groq, new PromptLoader(), MODELO, "intent.v2");
+        responde("""
+            {"offTopic": false, "mediaType": "any", "genres": [], "excludeGenres": [], "runtimeMin": 0,
+             "runtimeMax": 0, "yearFrom": 0, "yearTo": 0, "originalLanguage": "", "certificationMax": "",
+             "keywords": [], "providers": [], "referenceTitle": "", "summary": "Qualquer coisa"}
+            """);
+
+        assertThat(v2.interpret(pedido).meta().promptVersion()).isEqualTo("intent.v2");
+    }
+
+    @Test
+    void versaoQueNaoExisteDerrubaNaPartida() {
+        assertThatThrownBy(() -> new IntentService(groq, new PromptLoader(), MODELO, "intent.v99"))
+                .isInstanceOf(IllegalStateException.class);
+        // Nome fora do padrão nem chega a procurar arquivo (ex.: "../rerank.v1")
+        assertThatThrownBy(() -> new IntentService(groq, new PromptLoader(), MODELO, "../rerank.v1"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private void responde(String json) {

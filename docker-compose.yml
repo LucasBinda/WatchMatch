@@ -36,6 +36,10 @@ services:
     env_file:
       - path: ./backend/.env
         required: false
+    # Versão do prompt do /intent. Não é segredo, por isso fica aqui e não no .env. Para o eval comparar:
+    # LLM_INTENT_PROMPT=intent.v2 docker compose up -d llm-service
+    environment:
+      LLM_INTENT_PROMPT: ${LLM_INTENT_PROMPT:-intent.v3}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8083/health"]
       <<: *health-timing

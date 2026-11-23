@@ -25,7 +25,9 @@ import br.com.watchmatch.llm.model.Provider;
 @Service
 public class IntentService {
 
-    static final String PROMPT_VERSION = "intent.v2";
+    // Versão padrão do prompt. LLM_INTENT_PROMPT troca sem recompilar, para o eval comparar versões
+    static final String DEFAULT_PROMPT = "intent.v3";
+    private static final Pattern PROMPT_NAME = Pattern.compile("intent\\.v[0-9]+");
 
     private static final Set<String> CERTIFICATIONS = Set.of("L", "10", "12", "14", "16", "18");
     private static final Pattern LANGUAGE = Pattern.compile("[a-z]{2}");
@@ -36,11 +38,19 @@ public class IntentService {
     private final GroqClient groq;
     private final PromptLoader prompts;
     private final String model;
+    private final String promptVersion;
 
-    public IntentService(GroqClient groq, PromptLoader prompts, @Value("${llm.intent-model}") String model) {
+    public IntentService(GroqClient groq, PromptLoader prompts, @Value("${llm.intent-model}") String model,
+            @Value("${llm.intent-prompt:" + DEFAULT_PROMPT + "}") String promptVersion) {
+        if (!PROMPT_NAME.matcher(promptVersion).matches()) {
+            throw new IllegalArgumentException("LLM_INTENT_PROMPT inválido: " + promptVersion);
+        }
+        // Lê já na partida: versão que não existe derruba o serviço na hora, não na primeira busca
+        prompts.load(promptVersion);
         this.groq = groq;
         this.prompts = prompts;
         this.model = model;
+        this.promptVersion = promptVersion;
     }
 
     public Intent.Response interpret(Intent.Request request) {
@@ -48,10 +58,10 @@ public class IntentService {
         List<Integer> genreIds = request.genres().stream().map(Genre::id).toList();
         List<Integer> providerIds = request.providers().stream().map(Provider::id).toList();
 
-        Completion completion = groq.complete(model, prompts.load(PROMPT_VERSION), userMessage(request),
+        Completion completion = groq.complete(model, prompts.load(promptVersion), userMessage(request),
                 "intent", schema(genreIds, providerIds));
         Answer answer = Prompts.parse(completion.content(), Answer.class);
-        var meta = new LlmMeta(model, PROMPT_VERSION, Prompts.elapsedMs(start), completion.totalTokens());
+        var meta = new LlmMeta(model, promptVersion, Prompts.elapsedMs(start), completion.totalTokens());
 
         if (Boolean.TRUE.equals(answer.offTopic())) {
             return new Intent.Response(Criteria.empty(), List.of(), null, summary(answer.summary()), true, meta);
