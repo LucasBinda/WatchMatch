@@ -9,7 +9,9 @@
     "genresAny: pelo menos um desses ids em genres. genresNone: nenhum desses ids em genres.",
     "excludeGenresAll: todos esses ids em excludeGenres. keywordsAny: pelo menos um desses temas.",
     "certificationMaxAtMost: a classificação entendida não pode passar desta.",
-    "referenceTitle: a referência encontrada contém algum desses textos (sem diferenciar maiúsculas)."
+    "referenceTitle: a referência encontrada contém algum desses textos (sem diferenciar maiúsculas).",
+    "kind: normal, dificil (gíria, vago, injeção) ou generalizacao (sinais implícitos que o prompt não cita",
+    "  com essas palavras: mede se a melhora do prompt vale para frases que ninguém previu)."
   ],
   "cases": [
     {
@@ -124,6 +126,41 @@
       "providers": [8, 119],
       "filters": { "runtimeMax": 90 },
       "expect": { "genresAny": [27], "runtimeMax": [90, 90], "sources": { "runtimeMax": "filter" } }
+    },
+    {
+      "id": "dorama-comedia",
+      "kind": "generalizacao",
+      "query": "quero um dorama de comédia",
+      "providers": [8, 119],
+      "expect": { "originalLanguage": "ko", "genresAny": [35] }
+    },
+    {
+      "id": "bollywood",
+      "kind": "generalizacao",
+      "query": "um filme de Bollywood bem animado",
+      "providers": [8, 119],
+      "expect": { "mediaType": "movie", "originalLanguage": "hi" }
+    },
+    {
+      "id": "sobrinha-11-anos",
+      "kind": "generalizacao",
+      "query": "um filme pra ver com minha sobrinha de 11 anos",
+      "providers": [8, 119, 337],
+      "expect": { "mediaType": "movie", "certificationMaxAtMost": "10" }
+    },
+    {
+      "id": "documental-crimes-reais",
+      "kind": "generalizacao",
+      "query": "série documental sobre crimes reais",
+      "providers": [8, 119],
+      "expect": { "mediaType": "tv", "genresAny": [99], "keywordsAny": ["true crime", "crime", "murder", "serial killer", "real crime"] }
+    },
+    {
+      "id": "classico-italiano",
+      "kind": "generalizacao",
+      "query": "um clássico do cinema italiano",
+      "providers": [8, 119],
+      "expect": { "mediaType": "movie", "originalLanguage": "it" }
     },
     {
       "id": "giria-dar-risada",

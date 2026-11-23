@@ -220,7 +220,7 @@ repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 
 ### Telas
 
-1. **Home / busca** — campo grande ("O que você quer assistir hoje?"), chips de exemplo, seleção das plataformas assinadas (salva no `localStorage`, sem cadastro) e painel de filtros recolhível (filme/série, gênero, duração, ano, classificação, idioma).
+1. **Home / busca** — campo grande ("O que você quer assistir hoje?"), chips de exemplo, seleção das plataformas assinadas (salva no `localStorage`, sem cadastro) e painel de filtros recolhível (filme/série, gêneros, duração, ano, classificação, idioma). Os gêneros aceitam vários de uma vez, com "todos" (padrão: faroeste **e** ficção científica, vira `with_genres=37,878` no TMDB) ou "qualquer um" (`37|878`). Os gêneros que a IA entende são sempre "qualquer um": "comédia romântica" vira comédia ou romance. Cada gênero também pode ser proibido (botão ⊘ na lista). Abaixo da barra de busca, os filtros aparecem como chips com X: o X só tira do formulário, e o botão "Buscar de novo" aparece quando algo mudou desde a última busca. Proibido na tela vence o que a IA entender no texto.
 2. **Resultados** — critérios interpretados em chips editáveis ("Entendi: comédia · até 2h · Netflix") e grade de cards com o motivo da IA, logos das plataformas e "Gostei"/"Não gostei"/"Vou assistir".
 3. **Detalhe** (gaveta/modal) — sinopse, elenco, classificação, onde assistir, "mais parecidos".
 4. **Sobre / Privacidade** — limitações, fontes e **atribuição obrigatória ao TMDB e ao JustWatch**.
@@ -235,7 +235,7 @@ repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 | Contrato | Schemathesis | cada serviço cumpre seu OpenAPI |
 | Ponta a ponta | Docker Compose + chamadas ao gateway | fluxo completo, incluindo fallback sem LLM |
 
-**Eval do componente de IA** ([backend/eval/](../backend/eval/README.md)): 23 casos em `cases.json` com a frase e o esperado (16 normais e 7 difíceis: gíria, frase vaga, pedido impossível, prompt injection). Um script Python chama o gateway e confere o entendimento (critérios que a IA tirou da frase) e o resultado (cada título está na plataforma e respeita os critérios). Dá uma nota em vez de passar ou falhar; cada rodada fica salva em `backend/eval/results/`.
+**Eval do componente de IA** ([backend/eval/](../backend/eval/README.md)): 28 casos em `cases.json` com a frase e o esperado (16 normais, 7 difíceis — gíria, frase vaga, pedido impossível, prompt injection — e 5 de generalização, com sinais implícitos que o prompt não cita). Um script Python chama o gateway e confere o entendimento (critérios que a IA tirou da frase) e o resultado (cada título está na plataforma e respeita os critérios). Dá uma nota em vez de passar ou falhar; cada rodada fica salva em `backend/eval/results/`.
 
 | Métrica | Meta |
 | ------- | ---- |

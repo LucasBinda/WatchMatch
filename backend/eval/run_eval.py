@@ -11,6 +11,7 @@ Rode de novo depois de mexer no prompt e compare as notas (--compare).
 Uso (com o Docker Compose no ar):
     python3 backend/eval/run_eval.py --label intent.v2
     python3 backend/eval/run_eval.py --only terror-curto,vago
+    python3 backend/eval/run_eval.py --ai-mode filters --label intent.v3   # só o entendimento
     python3 backend/eval/run_eval.py --compare backend/eval/results/A.json backend/eval/results/B.json
 
 Só usa a biblioteca padrão do Python (3.10+).
@@ -207,8 +208,8 @@ def available(item, providers):
 
 # ---------- um caso ----------
 
-def run_case(base, case):
-    body = {"query": case["query"], "providers": case["providers"]}
+def run_case(base, case, ai_mode):
+    body = {"query": case["query"], "providers": case["providers"], "aiMode": ai_mode}
     if case.get("filters"):
         body["filters"] = case["filters"]
     status, resp, seconds = call(base, "POST", "/api/recommend", body)
@@ -317,7 +318,8 @@ def metrics_table(s):
 
 def report(results, summary, meta):
     lines = [f"# Eval da IA: {meta['label']}", "",
-             f"Rodado em {meta['date']} contra `{meta['base']}`, {summary['cases']} casos.", "",
+             f"Rodado em {meta['date']} contra `{meta['base']}`, {summary['cases']} casos, "
+             f"modo `{meta.get('aiMode', 'pick')}`.", "",
              "| Métrica | Resultado | Meta |", "| --- | --- | --- |"]
     lines += [f"| {a} | {b} | {c} |" for a, b, c in metrics_table(summary)]
     if summary["checksSkipped"]:
@@ -380,6 +382,8 @@ def main():
     parser.add_argument("--only", help="ids separados por vírgula")
     parser.add_argument("--pause", type=float, default=10.0,
                         help="segundos entre casos (o gateway deixa 6 buscas por minuto por IP)")
+    parser.add_argument("--ai-mode", choices=["pick", "filters"], default="pick",
+                        help="filters pula a escolha da IA (rerank): mede só o entendimento, gasta metade do Groq")
     parser.add_argument("--compare", nargs=2, metavar=("A.json", "B.json"), help="compara duas rodadas salvas")
     args = parser.parse_args()
 
@@ -405,7 +409,7 @@ def main():
         if i:
             time.sleep(args.pause)
         print(f"[{i + 1}/{len(cases)}] {case['id']}: {case['query']}", flush=True)
-        r = run_case(args.base, case)
+        r = run_case(args.base, case, args.ai_mode)
         if r.get("status") == 200:
             conf = [c for c in r["checks"] if c["ok"] is not None]
             good = sum(1 for c in conf if c["ok"])
@@ -416,7 +420,7 @@ def main():
 
     summary = summarize(results)
     now = datetime.now()
-    meta = {"label": args.label, "date": now.strftime("%Y-%m-%d %H:%M"), "base": args.base}
+    meta = {"label": args.label, "date": now.strftime("%Y-%m-%d %H:%M"), "base": args.base, "aiMode": args.ai_mode}
     text = report(results, summary, meta)
 
     out = HERE / "results"
