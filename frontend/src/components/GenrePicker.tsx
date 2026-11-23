@@ -1,22 +1,25 @@
-import { Check, ChevronDown, Sparkles } from 'lucide-react'
+import { Ban, Check, ChevronDown, Sparkles } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
+import type { GenreChange } from '../lib/searchForm'
 import type { Genre, GenreMatch } from '../types'
 
 interface Props {
   genres: Genre[]
   selected: number[]
+  excluded: number[]
   match: GenreMatch
-  ai?: boolean // gêneros preenchidos pela IA
-  onChange: (selected: number[], match: GenreMatch) => void
+  ai?: boolean // algum gênero (pedido ou proibido) preenchido pela IA
+  onChange: (change: GenreChange) => void
 }
 
-const MATCH_OPTIONS: { value: GenreMatch; label: string; hint: string }[] = [
-  { value: 'all', label: 'Todos', hint: 'O título precisa ter todos os gêneros marcados' },
-  { value: 'any', label: 'Qualquer um', hint: 'Basta o título ter um dos gêneros marcados' },
+const MATCH_OPTIONS: { value: GenreMatch; label: string }[] = [
+  { value: 'all', label: 'todos os gêneros' },
+  { value: 'any', label: 'pelo menos um' },
 ]
 
-// Campo do mesmo tamanho dos outros; clicando, abre a lista de gêneros com caixas de marcar
-export function GenrePicker({ genres, selected, match, ai = false, onChange }: Props) {
+// Campo do mesmo tamanho dos outros; clicando, abre a lista de gêneros.
+// Em cada linha: a caixa marca "quero"; o botão ⊘ à direita marca "não quero"
+export function GenrePicker({ genres, selected, excluded, match, ai = false, onChange }: Props) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const listId = useId()
@@ -43,16 +46,21 @@ export function GenrePicker({ genres, selected, match, ai = false, onChange }: P
     }
   }, [open])
 
-  const names = genres.filter((g) => selected.includes(g.id)).map((g) => g.name)
-  const summary =
-    names.length === 0
-      ? 'Qualquer gênero'
-      : names.length <= 2
-        ? names.join(match === 'all' ? ' + ' : ' ou ')
-        : `${names.length} gêneros`
+  const wanted = genres.filter((g) => selected.includes(g.id)).map((g) => g.name)
+  const banned = genres.filter((g) => excluded.includes(g.id)).map((g) => g.name.toLowerCase())
+  const summary = [
+    wanted.length === 0 ? '' : wanted.length <= 2 ? wanted.join(match === 'all' ? ' + ' : ' ou ') : `${wanted.length} gêneros`,
+    banned.length === 0 ? '' : banned.length === 1 ? `sem ${banned[0]}` : `sem ${banned.length}`,
+  ]
+    .filter(Boolean)
+    .join(', ')
 
-  function toggle(id: number) {
-    onChange(selected.includes(id) ? selected.filter((g) => g !== id) : [...selected, id], match)
+  function toggleWanted(id: number) {
+    onChange({ genres: selected.includes(id) ? selected.filter((g) => g !== id) : [...selected, id] })
+  }
+
+  function toggleBanned(id: number) {
+    onChange({ excludeGenres: excluded.includes(id) ? excluded.filter((g) => g !== id) : [...excluded, id] })
   }
 
   return (
@@ -78,7 +86,7 @@ export function GenrePicker({ genres, selected, match, ai = false, onChange }: P
         onClick={() => setOpen((v) => !v)}
         className={`relative w-full rounded-xl border ${ai ? 'border-brand/50' : 'border-line'} bg-surface-2 px-4 py-2.5 pr-10 text-left text-[15px] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30`}
       >
-        <span className={`block truncate ${names.length ? 'text-ink' : ''}`}>{summary}</span>
+        <span className={`block truncate ${summary ? 'text-ink' : ''}`}>{summary || 'Qualquer gênero'}</span>
         <ChevronDown
           className={`pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted transition ${open ? 'rotate-180' : ''}`}
         />
@@ -87,34 +95,51 @@ export function GenrePicker({ genres, selected, match, ai = false, onChange }: P
       {open && (
         <div
           id={listId}
-          className="absolute right-0 left-0 z-30 mt-2 min-w-56 rounded-xl border border-line bg-surface shadow-xl shadow-black/40"
+          className="absolute right-0 left-0 z-30 mt-2 min-w-64 rounded-xl border border-line bg-surface shadow-xl shadow-black/40"
         >
           {selected.length > 1 && (
-            <div role="radiogroup" aria-label="Combinar gêneros" className="grid grid-cols-2 gap-1 border-b border-line p-2">
-              {MATCH_OPTIONS.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={match === o.value}
-                  title={o.hint}
-                  onClick={() => onChange(selected, o.value)}
-                  className={`rounded-lg px-2 py-1.5 text-sm transition ${
-                    match === o.value ? 'bg-brand/20 text-ink' : 'text-muted hover:bg-surface-2 hover:text-ink'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
+            <div className="border-b border-line p-3">
+              <p id={`${listId}-match`} className="mb-2 text-xs text-muted">
+                Mostrar títulos que tenham:
+              </p>
+              <div role="radiogroup" aria-labelledby={`${listId}-match`} className="grid gap-1">
+                {MATCH_OPTIONS.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={match === o.value}
+                    onClick={() => onChange({ genreMatch: o.value })}
+                    className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition ${
+                      match === o.value ? 'bg-brand/20 text-ink' : 'text-muted hover:bg-surface-2 hover:text-ink'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`size-3.5 shrink-0 rounded-full border ${
+                        match === o.value ? 'border-4 border-brand' : 'border-faint'
+                      }`}
+                    />
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           <ul className="max-h-64 overflow-y-auto overscroll-contain p-1">
             {genres.map((g) => {
               const isOn = selected.includes(g.id)
+              const isBanned = excluded.includes(g.id)
               return (
-                <li key={g.id}>
-                  <label className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-surface-2">
-                    <input type="checkbox" checked={isOn} onChange={() => toggle(g.id)} className="peer sr-only" />
+                <li key={g.id} className="flex items-center rounded-lg hover:bg-surface-2">
+                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isOn}
+                      onChange={() => toggleWanted(g.id)}
+                      aria-label={`Quero ${g.name}`}
+                      className="peer sr-only"
+                    />
                     <span
                       aria-hidden="true"
                       className={`flex size-4 shrink-0 items-center justify-center rounded border transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 ${
@@ -123,17 +148,33 @@ export function GenrePicker({ genres, selected, match, ai = false, onChange }: P
                     >
                       {isOn && <Check className="size-3" strokeWidth={3} />}
                     </span>
-                    <span className={isOn ? 'text-ink' : 'text-muted'}>{g.name}</span>
+                    <span
+                      className={`truncate ${isOn ? 'text-ink' : isBanned ? 'text-danger line-through' : 'text-muted'}`}
+                    >
+                      {g.name}
+                    </span>
                   </label>
+                  <button
+                    type="button"
+                    aria-pressed={isBanned}
+                    aria-label={isBanned ? `Voltar a aceitar ${g.name}` : `Não quero ${g.name}`}
+                    title={isBanned ? 'Proibido. Clique para voltar a aceitar' : 'Não quero este gênero'}
+                    onClick={() => toggleBanned(g.id)}
+                    className={`mr-1 rounded-md p-1.5 transition ${
+                      isBanned ? 'bg-danger/15 text-danger' : 'text-faint hover:bg-surface hover:text-danger'
+                    }`}
+                  >
+                    <Ban className="size-4" />
+                  </button>
                 </li>
               )
             })}
           </ul>
-          {selected.length > 0 && (
+          {(selected.length > 0 || excluded.length > 0) && (
             <div className="border-t border-line p-2">
               <button
                 type="button"
-                onClick={() => onChange([], match)}
+                onClick={() => onChange({ genres: [], excludeGenres: [] })}
                 className="w-full rounded-lg px-3 py-1.5 text-sm text-muted transition hover:bg-surface-2 hover:text-ink"
               >
                 Limpar gêneros

@@ -3,7 +3,7 @@ import type { KeyboardEvent } from 'react'
 import { GenrePicker } from './GenrePicker'
 import { PlatformPicker } from './PlatformPicker'
 import { SelectField } from './SelectField'
-import { AI_MODE_OPTIONS, MEDIA_OPTIONS, genresFor, runtimeOptions, setField, setGenres, type SearchForm } from '../lib/searchForm'
+import { AI_MODE_OPTIONS, MEDIA_OPTIONS, genresFor, runtimeOptions, setField, setGenreFilter, type SearchForm } from '../lib/searchForm'
 import type { Meta } from '../types'
 
 const MAX_QUERY = 500
@@ -66,9 +66,10 @@ export function SearchFields({ meta, form, onChange, wide = false, autoFocus = f
         <GenrePicker
           genres={genres}
           selected={form.genres}
+          excluded={form.excludeGenres}
           match={form.genreMatch}
-          ai={ai('genres')}
-          onChange={(selected, match) => onChange(setGenres(form, selected, match))}
+          ai={ai('genres') || ai('excludeGenres')}
+          onChange={(change) => onChange(setGenreFilter(form, change))}
         />
         <SelectField
           id="runtime"

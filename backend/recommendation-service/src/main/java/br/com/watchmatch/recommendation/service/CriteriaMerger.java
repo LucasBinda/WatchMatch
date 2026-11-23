@@ -20,9 +20,22 @@ public class CriteriaMerger {
 
         List<Integer> genres = pick("genres", f.genres(), ai.genres(), sources);
         List<Integer> excludeGenres = pick("excludeGenres", f.excludeGenres(), ai.excludeGenres(), sources);
-        // Gênero pedido nunca pode ficar ao mesmo tempo na lista de proibidos
+        // Um gênero não pode ser pedido e proibido ao mesmo tempo. Vence o que o usuário marcou na tela:
+        // proibiu terror na tela e a IA entendeu "terror" no texto, terror continua proibido
         if (excludeGenres != null && genres != null) {
-            excludeGenres = excludeGenres.stream().filter(g -> !genres.contains(g)).toList();
+            boolean screenForbids = "filter".equals(sources.get("excludeGenres"))
+                    && "ai".equals(sources.get("genres"));
+            if (screenForbids) {
+                List<Integer> forbidden = excludeGenres;
+                genres = genres.stream().filter(g -> !forbidden.contains(g)).toList();
+                if (genres.isEmpty()) {
+                    genres = null;
+                    sources.remove("genres");
+                }
+            } else {
+                List<Integer> wanted = genres;
+                excludeGenres = excludeGenres.stream().filter(g -> !wanted.contains(g)).toList();
+            }
         }
 
         Criteria merged = new Criteria(

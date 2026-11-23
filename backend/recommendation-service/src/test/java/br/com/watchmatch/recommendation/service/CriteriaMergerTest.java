@@ -93,6 +93,29 @@ class CriteriaMergerTest {
     }
 
     @Test
+    void generoProibidoNaTelaVenceOGeneroDaIa() {
+        // Proibiu terror na tela; o texto diz "um terror ou suspense"
+        var filtros = new Criteria(null, null, List.of(27), null, null, null, null, null, null, null);
+        var ia = intent(new Criteria(null, List.of(27, 53), null, null, null, null, null, null, null, null), List.of());
+
+        var resultado = merger.merge(filtros, ia, List.of(8));
+
+        assertThat(resultado.criteria().genres()).containsExactly(53);
+        assertThat(resultado.criteria().excludeGenres()).containsExactly(27);
+    }
+
+    @Test
+    void seAIaSoPediuOGeneroProibidoFicaSemGenero() {
+        var filtros = new Criteria(null, null, List.of(27), null, null, null, null, null, null, null);
+        var ia = intent(new Criteria(null, List.of(27), null, null, null, null, null, null, null, null), List.of());
+
+        var resultado = merger.merge(filtros, ia, List.of(8));
+
+        assertThat(resultado.criteria().genres()).isNull();
+        assertThat(resultado.sources()).doesNotContainKey("genres");
+    }
+
+    @Test
     void plataformaCitadaNoTextoRestringeAsDoUsuario() {
         // "quero algo na Netflix", e o usuário assina Netflix e Prime
         var resultado = merger.merge(Criteria.empty(), intent(Criteria.empty(), List.of(8)), List.of(8, 119));

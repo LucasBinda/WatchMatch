@@ -1,12 +1,13 @@
 import { formatRuntime } from './format'
 import type { AiMode, AppliedCriteria, Criteria, GenreMatch, MediaType, Meta, PageSize } from '../types'
 
-export type FilterField = 'genres' | 'runtimeMax' | 'mediaType'
+export type FilterField = 'genres' | 'excludeGenres' | 'runtimeMax' | 'mediaType'
 
 export interface SearchForm {
   query: string
   genres: number[] // ids marcados; vazio = qualquer gênero
   genreMatch: GenreMatch // com 2 ou mais gêneros: 'all' exige todos, 'any' aceita qualquer um
+  excludeGenres: number[] // gêneros proibidos ("nada de terror")
   runtimeMax: string // minutos ou ''
   mediaType: string // 'movie' | 'tv' | ''
   providers: number[]
@@ -56,14 +57,77 @@ export function genreLabel(form: SearchForm, meta: Meta): string {
   const names = genresFor(form.mediaType, meta)
     .filter((g) => form.genres.includes(g.id))
     .map((g) => g.name)
+  const banned = genresFor(form.mediaType, meta)
+    .filter((g) => form.excludeGenres.includes(g.id))
+    .map((g) => `sem ${g.name.toLowerCase()}`)
+  const wanted = wantedLabel(names, form.genreMatch)
+  return [wanted, ...banned].filter(Boolean).join(', ')
+}
+
+function wantedLabel(names: string[], genreMatch: GenreMatch): string {
   if (names.length <= 1) return names[0] ?? ''
-  if (names.length > 3) return `${names.length} gêneros (${form.genreMatch === 'all' ? 'todos' : 'qualquer um'})`
-  return names.join(form.genreMatch === 'all' ? ' + ' : ' ou ')
+  if (names.length > 3) return `${names.length} gêneros (${genreMatch === 'all' ? 'todos' : 'pelo menos um'})`
+  return names.join(genreMatch === 'all' ? ' + ' : ' ou ')
+}
+
+export type FilterChip =
+  | { kind: 'mediaType'; label: string; ai: boolean }
+  | { kind: 'genre'; id: number; label: string; ai: boolean }
+  | { kind: 'excludeGenre'; id: number; label: string; ai: boolean }
+  | { kind: 'runtimeMax'; label: string; ai: boolean }
+
+// Os filtros do formulário como chips da página principal (cada um com X)
+export function filterChips(form: SearchForm, meta: Meta): FilterChip[] {
+  const ai = (field: FilterField) => form.aiFields.includes(field)
+  const genres = genresFor(form.mediaType, meta)
+  const chips: FilterChip[] = []
+  if (form.mediaType) {
+    chips.push({ kind: 'mediaType', label: form.mediaType === 'movie' ? 'Filmes' : 'Séries', ai: ai('mediaType') })
+  }
+  for (const g of genres.filter((g) => form.genres.includes(g.id))) {
+    chips.push({ kind: 'genre', id: g.id, label: g.name, ai: ai('genres') })
+  }
+  for (const g of genres.filter((g) => form.excludeGenres.includes(g.id))) {
+    chips.push({ kind: 'excludeGenre', id: g.id, label: `sem ${g.name.toLowerCase()}`, ai: ai('excludeGenres') })
+  }
+  if (form.runtimeMax) chips.push({ kind: 'runtimeMax', label: runtimeLabel(form.runtimeMax), ai: ai('runtimeMax') })
+  return chips
+}
+
+// O X de um chip: tira só aquele filtro do formulário. A busca roda quando o usuário pedir
+export function removeFilter(form: SearchForm, chip: FilterChip, meta: Meta): SearchForm {
+  switch (chip.kind) {
+    case 'genre':
+      return setGenreFilter(form, { genres: form.genres.filter((g) => g !== chip.id) })
+    case 'excludeGenre':
+      return setGenreFilter(form, { excludeGenres: form.excludeGenres.filter((g) => g !== chip.id) })
+    case 'runtimeMax':
+      return setField(form, 'runtimeMax', '')
+    case 'mediaType': {
+      // Sem formato vale a lista de gêneros de filme: ficam só os gêneros que existem nela
+      const ids = new Set(genresFor('', meta).map((g) => g.id))
+      const next = { ...form, mediaType: '', aiFields: form.aiFields.filter((f) => f !== 'mediaType') }
+      next.genres = form.genres.filter((g) => ids.has(g))
+      next.excludeGenres = form.excludeGenres.filter((g) => ids.has(g))
+      return next
+    }
+  }
 }
 
 // Mantém as plataformas e o modo da IA: são preferências do usuário, não da busca
 export function clearSearch(form: SearchForm): SearchForm {
-  return { ...form, query: '', genres: [], genreMatch: 'all', runtimeMax: '', mediaType: '', aiFields: [] }
+  return { ...clearFilters(form), query: '' }
+}
+
+// Só os filtros (o "Limpar" dos chips): o texto da busca fica
+export function clearFilters(form: SearchForm): SearchForm {
+  return { ...form, genres: [], genreMatch: 'all', excludeGenres: [], runtimeMax: '', mediaType: '', aiFields: [] }
+}
+
+// Tudo que muda o resultado. Diferente da última busca = mostrar "Buscar de novo"
+export function searchKey(form: SearchForm): string {
+  const { query, genres, genreMatch, excludeGenres, runtimeMax, mediaType, providers, aiMode } = form
+  return JSON.stringify([query.trim(), genres, genreMatch, excludeGenres, runtimeMax, mediaType, providers, aiMode])
 }
 
 // O usuário mudou um campo: ele deixa de ser da IA
@@ -72,14 +136,29 @@ export function setField(form: SearchForm, field: 'runtimeMax' | 'mediaType', va
   // Trocar o formato troca a lista de gêneros
   if (field === 'mediaType') {
     next.genres = []
-    next.aiFields = next.aiFields.filter((f) => f !== 'genres')
+    next.excludeGenres = []
+    next.aiFields = next.aiFields.filter((f) => f !== 'genres' && f !== 'excludeGenres')
   }
   return next
 }
 
-// Marcar, desmarcar ou trocar "todos / qualquer um": os gêneros passam a ser do usuário
-export function setGenres(form: SearchForm, genres: number[], genreMatch = form.genreMatch): SearchForm {
-  return { ...form, genres, genreMatch, aiFields: form.aiFields.filter((f) => f !== 'genres') }
+export interface GenreChange {
+  genres?: number[]
+  excludeGenres?: number[]
+  genreMatch?: GenreMatch
+}
+
+// Marcar, proibir, tirar ou trocar "todos / pelo menos um": o que mudou passa a ser do usuário.
+// Um gênero nunca fica pedido e proibido ao mesmo tempo: o último clique vence
+export function setGenreFilter(form: SearchForm, change: GenreChange): SearchForm {
+  const next = { ...form, ...change }
+  if (change.genres) next.excludeGenres = next.excludeGenres.filter((g) => !change.genres!.includes(g))
+  if (change.excludeGenres) next.genres = next.genres.filter((g) => !change.excludeGenres!.includes(g))
+  const touched: FilterField[] = []
+  if (change.genres || change.genreMatch || next.genres.length !== form.genres.length) touched.push('genres')
+  if (change.excludeGenres || next.excludeGenres.length !== form.excludeGenres.length) touched.push('excludeGenres')
+  next.aiFields = form.aiFields.filter((f) => !touched.includes(f))
+  return next
 }
 
 // Só o que o usuário escolheu vai como filtro; o que a IA preencheu fica de fora
@@ -91,6 +170,7 @@ export function userFilters(form: SearchForm): Criteria {
     filters.genres = form.genres
     if (form.genres.length > 1 && form.genreMatch === 'all') filters.genreMatch = 'all'
   }
+  if (mine('excludeGenres')) filters.excludeGenres = form.excludeGenres
   if (mine('runtimeMax')) filters.runtimeMax = Number(form.runtimeMax)
   return filters
 }
@@ -101,14 +181,14 @@ export function applyAiCriteria(form: SearchForm, criteria: AppliedCriteria, met
   // O que a IA tinha preenchido antes some; ela decidiu de novo agora
   const next: SearchForm = { ...form, aiFields: [] }
   for (const field of form.aiFields) {
-    if (field === 'genres') next.genres = []
+    if (field === 'genres' || field === 'excludeGenres') next[field] = []
     else next[field] = ''
   }
 
   if (fromAi('mediaType') && criteria.mediaType) {
     // Gênero escolhido pelo usuário que não existe no novo formato: não troca o formato
     const ids = new Set(genresFor(criteria.mediaType, meta).map((g) => g.id))
-    const keepsGenre = next.genres.every((g) => ids.has(g))
+    const keepsGenre = [...next.genres, ...next.excludeGenres].every((g) => ids.has(g))
     if (keepsGenre) {
       next.mediaType = criteria.mediaType
       next.aiFields.push('mediaType')
@@ -122,6 +202,14 @@ export function applyAiCriteria(form: SearchForm, criteria: AppliedCriteria, met
       next.genres = genres
       next.genreMatch = 'any'
       next.aiFields.push('genres')
+    }
+  }
+  if (fromAi('excludeGenres') && criteria.excludeGenres) {
+    const ids = new Set(genresFor(next.mediaType, meta).map((g) => g.id))
+    const excluded = criteria.excludeGenres.filter((g) => ids.has(g) && !next.genres.includes(g))
+    if (excluded.length > 0) {
+      next.excludeGenres = excluded
+      next.aiFields.push('excludeGenres')
     }
   }
   if (fromAi('runtimeMax') && criteria.runtimeMax) {

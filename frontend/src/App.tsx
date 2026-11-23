@@ -1,6 +1,7 @@
 import { LoaderCircle } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getMeta, recommend } from './api/client'
+import { FilterChips } from './components/FilterChips'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
 import { MockBanner } from './components/MockBanner'
@@ -8,7 +9,7 @@ import { ResultsPanel } from './components/ResultsPanel'
 import { SearchModal } from './components/SearchModal'
 import { TitleDetails } from './components/TitleDetails'
 import { loadAiMode, loadPageSize, loadProviders, saveAiMode, savePageSize, saveProviders } from './lib/preferences'
-import { applyAiCriteria, userFilters, type SearchForm } from './lib/searchForm'
+import { applyAiCriteria, searchKey, userFilters, type SearchForm } from './lib/searchForm'
 import type { Meta, PageSize, Recommendation, RecommendRequest, RecommendResponse } from './types'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
     query: '',
     genres: [],
     genreMatch: 'all',
+    excludeGenres: [],
     runtimeMax: '',
     mediaType: '',
     providers: loadProviders(),
@@ -32,6 +34,9 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Recommendation | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  // O formulário como ficou depois da última busca (já com o que a IA entendeu). Diferente = "Buscar de novo"
+  const [searchedKey, setSearchedKey] = useState<string | null>(null)
+  const snapshotNext = useRef(false)
 
   useEffect(() => {
     getMeta()
@@ -41,6 +46,12 @@ export default function App() {
 
   useEffect(() => saveProviders(form.providers), [form.providers])
   useEffect(() => saveAiMode(form.aiMode), [form.aiMode])
+  // Roda depois que a resposta preencheu o formulário: guarda como ele ficou
+  useEffect(() => {
+    if (!snapshotNext.current) return
+    snapshotNext.current = false
+    setSearchedKey(searchKey(form))
+  }, [form])
 
   function search(current: SearchForm) {
     return run({
@@ -60,6 +71,7 @@ export default function App() {
       setResult(response)
       setLastRequest(request)
       // O que a IA entendeu aparece nos campos de Gênero, Duração e Formato
+      snapshotNext.current = true
       if (meta) setForm((prev) => applyAiCriteria(prev, response.criteria, meta))
     } catch (e) {
       setResult(null)
@@ -131,6 +143,15 @@ export default function App() {
                 onClose={() => setSearchOpen(false)}
                 onChange={setForm}
                 onSubmit={submitSearch}
+              />
+              <FilterChips
+                meta={meta}
+                form={form}
+                dirty={searchKey(form) !== searchedKey}
+                searched={searchedKey !== null}
+                loading={loading}
+                onChange={setForm}
+                onSearch={submitSearch}
               />
               <ResultsPanel
                 meta={meta}
