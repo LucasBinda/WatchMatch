@@ -131,7 +131,12 @@ components:
           $ref: '#/components/schemas/MediaType'
         genres:
           type: array
-          description: Ids de gênero que o título deve ter (qualquer um deles, ou todos com `genreMatch=all`)
+          description: |
+            Ids de gênero que o título deve ter (qualquer um deles, ou todos com `genreMatch=all`).
+            Filme e série têm listas diferentes no TMDB; o site usa uma lista só (ids de filme, e os de série
+            para gêneros que só existem em série). O catalog-service traduz para o tipo buscado (Ficção
+            científica 878 vira Sci-Fi & Fantasy 10765 em série) e não busca o tipo que não tem o gênero
+            pedido (Terror em séries). Ids de série também são aceitos. Vale o mesmo para `excludeGenres`.
           items:
             type: integer
         genreMatch:

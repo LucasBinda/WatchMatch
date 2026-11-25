@@ -3,6 +3,7 @@ package br.com.watchmatch.catalog.service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import br.com.watchmatch.catalog.domain.Criteria;
 import br.com.watchmatch.catalog.domain.DiscoverQueryBuilder;
 import br.com.watchmatch.catalog.domain.DiscoverRequest;
+import br.com.watchmatch.catalog.domain.GenreMap;
 import br.com.watchmatch.catalog.domain.TitleList;
 import br.com.watchmatch.catalog.domain.TitleRef;
 import br.com.watchmatch.catalog.domain.TitleSummary;
@@ -60,7 +62,14 @@ public class DiscoverService {
         boolean hasMore = false;
 
         for (TitleType type : types) {
-            TmdbPage page = client.discover(type, queryBuilder.build(request, type, keywordIds));
+            // Cada tipo com os seus ids de gênero; tipo impossível (Terror em séries) nem é buscado
+            Optional<Criteria> criteria = GenreMap.forType(request.criteria(), type);
+            if (criteria.isEmpty()) {
+                continue;
+            }
+            var typed = new DiscoverRequest(criteria.get(), request.providers(), request.sortBy(),
+                    request.mediaType(), request.page());
+            TmdbPage page = client.discover(type, queryBuilder.build(typed, type, keywordIds));
             perType.add(toSummaries(page, type));
             hasMore |= hasNextPage(page);
         }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import br.com.watchmatch.catalog.domain.Criteria;
 import br.com.watchmatch.catalog.domain.DiscoverRequest;
+import br.com.watchmatch.catalog.domain.GenreMap;
 import br.com.watchmatch.catalog.domain.Reference;
 import br.com.watchmatch.catalog.domain.SimilarRequest;
 import br.com.watchmatch.catalog.domain.SimilarResult;
@@ -75,7 +76,9 @@ public class SimilarService {
 
         if (targetType == refType) {
             TmdbPage recommended = client.recommendations(refType, ref.id(), page);
-            recommendedAvailable(recommended, refType, request.providers(), criteria)
+            // As recomendações são do tipo de X: os gêneros pedidos precisam estar nos ids desse tipo
+            Optional<Criteria> typed = GenreMap.forType(criteria, refType);
+            recommendedAvailable(recommended, refType, request.providers(), typed.orElse(null))
                     .forEach(t -> items.putIfAbsent(key(t.mediaType(), t.id()), t));
             hasMore = recommended != null && DiscoverService.hasNextPage(recommended);
         }
@@ -108,9 +111,10 @@ public class SimilarService {
                 .map(hit -> new Found(hit.mediaType(), client.reference(hit.mediaType(), hit.id())));
     }
 
+    // criteria null = nenhuma recomendação serve (gênero pedido que o tipo de X não tem)
     private List<TitleSummary> recommendedAvailable(TmdbPage page, TitleType type, List<Integer> providers,
             Criteria criteria) {
-        if (page == null || page.results() == null || page.results().isEmpty()) {
+        if (criteria == null || page == null || page.results() == null || page.results().isEmpty()) {
             return List.of();
         }
         List<TitleRef> refs = page.results().stream().map(r -> new TitleRef(type, r.id())).toList();

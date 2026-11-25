@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -71,6 +72,33 @@ class DiscoverServiceTest {
         TitleList lista = service.discover(pedido(null, 1), 40);
 
         assertThat(lista.items()).extracting(TitleSummary::title).containsExactly("F1", "S1", "F2", "F3");
+    }
+
+    @Test
+    void semFormatoCadaTipoRecebeOsSeusIdsDeGenero() {
+        when(client.discover(eq(TitleType.MOVIE), anyMap())).thenReturn(new TmdbPage(1, 1, List.of(filme(1, "F1"))));
+        when(client.discover(eq(TitleType.TV), anyMap())).thenReturn(new TmdbPage(1, 1, List.of(serie(2, "S1"))));
+
+        var pedido = new DiscoverRequest(Criteria.empty().withGenres(List.of(878)), List.of(8), SortBy.POPULARITY,
+                null, 1);
+        service.discover(pedido, 40);
+
+        // Ficção científica: 878 em filme, 10765 (Sci-Fi & Fantasy) em série
+        verify(client).discover(eq(TitleType.MOVIE), argThat(p -> "878".equals(p.get("with_genres"))));
+        verify(client).discover(eq(TitleType.TV), argThat(p -> "10765".equals(p.get("with_genres"))));
+    }
+
+    @Test
+    void tipoSemOGeneroPedidoNemEBuscado() {
+        when(client.discover(eq(TitleType.MOVIE), anyMap())).thenReturn(new TmdbPage(1, 1, List.of(filme(1, "F1"))));
+
+        var terror = new DiscoverRequest(Criteria.empty().withGenres(List.of(27)), List.of(8), SortBy.POPULARITY,
+                null, 1);
+        TitleList lista = service.discover(terror, 40);
+
+        // O TMDB não tem Terror em séries: buscar sem o gênero traria qualquer série
+        verify(client, never()).discover(eq(TitleType.TV), anyMap());
+        assertThat(lista.items()).extracting(TitleSummary::title).containsExactly("F1");
     }
 
     @Test
