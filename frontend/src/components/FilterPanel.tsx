@@ -2,13 +2,14 @@ import { Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { GenreList, RadioDot } from './GenreList'
 import { PlatformPicker } from './PlatformPicker'
+import { RuntimeSlider } from './RuntimeSlider'
 import { allGenres } from '../lib/genres'
 import {
   AI_MODE_OPTIONS,
   MEDIA_OPTIONS,
-  runtimeOptions,
   setField,
   setGenreFilter,
+  setRuntime,
   type SearchForm,
 } from '../lib/searchForm'
 import type { Meta } from '../types'
@@ -53,13 +54,15 @@ export function FilterPanel({ meta, form, onChange }: Props) {
         />
       </Section>
 
-      <Section title="Duração" ai={ai('runtimeMax')}>
-        <OptionList
-          name="Duração"
-          value={form.runtimeMax}
-          options={runtimeOptions(form.runtimeMax)}
-          onChange={(v) => onChange(setField(form, 'runtimeMax', v))}
+      <Section title="Duração" ai={ai('runtimeMin') || ai('runtimeMax')}>
+        <RuntimeSlider
+          min={form.runtimeMin}
+          max={form.runtimeMax}
+          onChange={(min, max) => onChange(setRuntime(form, min, max))}
         />
+        {form.mediaType !== 'movie' && (
+          <p className="mt-2 text-xs text-faint">Em séries, vale a duração de cada episódio.</p>
+        )}
       </Section>
 
       <Section title="Plataformas que você assina">

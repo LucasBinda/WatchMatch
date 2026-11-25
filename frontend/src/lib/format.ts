@@ -45,8 +45,15 @@ export function criteriaChips(criteria: AppliedCriteria, meta: Meta): CriteriaCh
   for (const id of criteria.excludeGenres ?? []) {
     chips.push({ label: `sem ${genreName(id).toLowerCase()}`, source: source('excludeGenres') })
   }
-  if (criteria.runtimeMax) {
-    chips.push({ label: `até ${formatRuntime(criteria.runtimeMax)}`, source: source('runtimeMax') })
+  if (criteria.runtimeMin || criteria.runtimeMax) {
+    const { runtimeMin: min, runtimeMax: max } = criteria
+    const label =
+      min && max
+        ? `${formatRuntime(min)} a ${formatRuntime(max)}`
+        : max
+          ? `até ${formatRuntime(max)}`
+          : `mais de ${formatRuntime(min!)}`
+    chips.push({ label, source: source(max ? 'runtimeMax' : 'runtimeMin') })
   }
   if (criteria.yearFrom || criteria.yearTo) {
     const label =

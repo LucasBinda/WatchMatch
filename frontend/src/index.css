@@ -38,3 +38,43 @@ body {
   @apply bg-page text-ink font-sans antialiased;
 }
 
+/* Slider de duração (RuntimeSlider): dois <input type="range"> sobrepostos. A trilha é desenhada por fora;
+   aqui os inputs ficam transparentes e só as bolinhas recebem o clique, para cada uma ser arrastada */
+.range-thumbs {
+  pointer-events: none;
+  appearance: none;
+  background: transparent;
+  margin: 0;
+}
+.range-thumbs::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.range-thumbs::-moz-range-track {
+  background: transparent;
+}
+.range-thumbs::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--color-page);
+  border: 3px solid var(--color-brand);
+  cursor: grab;
+}
+.range-thumbs::-moz-range-thumb {
+  pointer-events: auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--color-page);
+  border: 3px solid var(--color-brand);
+  cursor: grab;
+}
+.range-thumbs:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-brand) 35%, transparent);
+}
+.range-thumbs:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-brand) 35%, transparent);
+}
+

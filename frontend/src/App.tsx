@@ -23,6 +23,7 @@ export default function App() {
     genres: [],
     genreMatch: 'all',
     excludeGenres: [],
+    runtimeMin: '',
     runtimeMax: '',
     mediaType: '',
     providers: loadProviders(),
@@ -127,7 +128,7 @@ export default function App() {
       <MockBanner />
       <Header />
 
-      <main id="descobrir" className="mx-auto max-w-7xl px-4 pt-8 pb-14 sm:px-6 sm:pt-12">
+      <main id="descobrir" className="px-4 pt-8 pb-14 sm:px-6 sm:pt-12 lg:px-8">
         <div className="mb-8 max-w-3xl">
           <h1 className="font-display text-3xl leading-[1.1] font-bold tracking-tight sm:text-4xl lg:text-5xl">
             O que vamos assistir <span className="text-brand">hoje?</span>

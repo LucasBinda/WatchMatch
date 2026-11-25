@@ -212,7 +212,7 @@ inteira atrás do mesmo Wi-Fi); por custo em tokens, com Bucket4j (mais justo, m
 cota diária por IP (exige Redis ou Postgres). Abaixo do gateway há ainda o limite **suave** do recommendation-service (seção 4, "Resiliência"): quando o
 Groq ou as fichas apertam, a busca cai para o modo `filters` em vez de falhar.
 
-No deploy, o Caddy fica na frente com o HTTPS, e o gateway usa o IP real que ele repassa (`deploy/real-ip.conf`,
+No deploy, um túnel da Cloudflare fica na frente com o HTTPS, e o gateway usa o IP real que ela repassa (`deploy/real-ip.conf`,
 ver [DEPLOY.md](DEPLOY.md)).
 
 ## 6. Estrutura do repositório
@@ -242,7 +242,7 @@ repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 
 ### Telas
 
-1. **Home / busca** — campo grande ("O que vamos assistir hoje?"), chips de exemplo e os filtros numa coluna à esquerda, como nos marketplaces (formato, gêneros, duração, plataformas assinadas — salvas no `localStorage`, sem cadastro — e o modo da IA). No celular a coluna vira a janela do botão "Filtros". Os cards mostram o pôster em destaque, com título, ano, duração e nota sobre ele. Os gêneros aceitam vários de uma vez, com "todos" (padrão: faroeste **e** ficção científica, vira `with_genres=37,878` no TMDB) ou "qualquer um" (`37|878`). Os gêneros que a IA entende são sempre "qualquer um": "comédia romântica" vira comédia ou romance. Cada gênero também pode ser proibido (botão ⊘ na lista). Abaixo da barra de busca, os filtros aparecem como chips com X: o X só tira do formulário, e o botão "Buscar de novo" aparece quando algo mudou desde a última busca. Proibido na tela vence o que a IA entender no texto.
+1. **Home / busca** — campo grande ("O que vamos assistir hoje?"), chips de exemplo e os filtros numa coluna à esquerda, como nos marketplaces (formato, gêneros, duração — slider de mínimo e máximo de 0 a 4h+, com pontas abertas e atalhos —, plataformas assinadas — salvas no `localStorage`, sem cadastro — e o modo da IA). No celular a coluna vira a janela do botão "Filtros". Os cards mostram o pôster em destaque, com título, ano, duração e nota sobre ele. Os gêneros aceitam vários de uma vez, com "todos" (padrão: faroeste **e** ficção científica, vira `with_genres=37,878` no TMDB) ou "qualquer um" (`37|878`). Os gêneros que a IA entende são sempre "qualquer um": "comédia romântica" vira comédia ou romance. Cada gênero também pode ser proibido (botão ⊘ na lista). Abaixo da barra de busca, os filtros aparecem como chips com X: o X só tira do formulário, e o botão "Buscar de novo" aparece quando algo mudou desde a última busca. Proibido na tela vence o que a IA entender no texto.
 2. **Resultados** — critérios interpretados em chips editáveis ("Entendi: comédia · até 2h · Netflix") e grade de cards com o motivo da IA, logos das plataformas e "Gostei"/"Não gostei"/"Vou assistir".
 3. **Detalhe** (gaveta/modal) — sinopse, elenco, classificação, onde assistir, "mais parecidos".
 4. **Sobre / Privacidade** — limitações, fontes e **atribuição obrigatória ao TMDB e ao JustWatch**.

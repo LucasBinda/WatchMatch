@@ -44,7 +44,7 @@ src/
   lib/useModalDialog.ts   abre/fecha um <dialog> nativo a partir do estado
   lib/palettes.ts         paletas de cor e gerador (seletor de paletas)
   components/
-    Header · SearchBox · FilterChips · FilterPanel · GenreList · PlatformPicker
+    Header · SearchBox · FilterChips · FilterPanel · GenreList · RuntimeSlider · PlatformPicker
     FiltersDialog (filtros no celular) · ResultsPanel · CriteriaChips · TitleCard · TitleDetails
     PaletteSwitcher · Footer
 ```

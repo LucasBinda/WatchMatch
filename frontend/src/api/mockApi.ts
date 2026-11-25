@@ -39,6 +39,7 @@ export function recommend(request: RecommendRequest): Promise<RecommendResponse>
     .filter((t) => t.watch.providers.some((p) => wanted.has(p.id)))
     .filter((t) => !filters.mediaType || t.mediaType === filters.mediaType)
     .filter((t) => !filters.runtimeMax || t.mediaType === 'tv' || (t.runtime ?? 0) <= filters.runtimeMax)
+    .filter((t) => !filters.runtimeMin || t.mediaType === 'tv' || (t.runtime ?? 0) >= filters.runtimeMin)
     .filter((t) => {
       if (!filters.genres?.length) return true
       // Mesma tradução do catálogo: série com Sci-Fi & Fantasy conta como Ficção científica e Fantasia

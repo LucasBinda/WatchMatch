@@ -2,14 +2,15 @@ import { allGenres, canonicalGenres } from './genres'
 import { formatRuntime } from './format'
 import type { AiMode, AppliedCriteria, Criteria, GenreMatch, MediaType, Meta, PageSize } from '../types'
 
-export type FilterField = 'genres' | 'excludeGenres' | 'runtimeMax' | 'mediaType'
+export type FilterField = 'genres' | 'excludeGenres' | 'runtimeMin' | 'runtimeMax' | 'mediaType'
 
 export interface SearchForm {
   query: string
   genres: number[] // ids marcados; vazio = qualquer gênero
   genreMatch: GenreMatch // com 2 ou mais gêneros: 'all' exige todos, 'any' aceita qualquer um
   excludeGenres: number[] // gêneros proibidos ("nada de terror")
-  runtimeMax: string // minutos ou ''
+  runtimeMin: string // minutos ou '' (sem mínimo)
+  runtimeMax: string // minutos ou '' (sem máximo)
   mediaType: string // 'movie' | 'tv' | ''
   providers: number[]
   aiMode: AiMode
@@ -18,11 +19,16 @@ export interface SearchForm {
   aiFields: FilterField[]
 }
 
-export const RUNTIME_OPTIONS = [
-  { value: '', label: 'Qualquer duração' },
-  { value: '90', label: 'Até 1h30' },
-  { value: '120', label: 'Até 2 horas' },
-  { value: '150', label: 'Até 2h30' },
+// Slider de duração: de 0 a 4h, de 5 em 5 minutos. As pontas são abertas: no começo = sem mínimo,
+// no fim = sem máximo ("4h+"). Vale para filme e, em série, para cada episódio
+export const RUNTIME_LIMIT = 240
+export const RUNTIME_STEP = 5
+
+export const RUNTIME_SHORTCUTS: { label: string; min: string; max: string }[] = [
+  { label: 'Até 30 min', min: '', max: '30' },
+  { label: 'Até 1h30', min: '', max: '90' },
+  { label: '1h30 a 2h', min: '90', max: '120' },
+  { label: 'Mais de 2h', min: '120', max: '' },
 ]
 
 export const PAGE_SIZES: PageSize[] = [12, 24, 36, 48]
@@ -38,14 +44,22 @@ export const MEDIA_OPTIONS = [
   { value: 'tv', label: 'Só séries' },
 ]
 
-// A IA pode escolher uma duração fora da lista (ex.: 100 min); aí entra uma opção a mais
-export function runtimeOptions(value: string) {
-  if (RUNTIME_OPTIONS.some((o) => o.value === value)) return RUNTIME_OPTIONS
-  return [...RUNTIME_OPTIONS, { value, label: runtimeLabel(value) }]
+// "Qualquer duração", "Até 1h30", "Mais de 2h" ou "1h30 a 2h"
+export function runtimeRangeLabel(min: string, max: string): string {
+  if (min && max) return `${formatRuntime(Number(min))} a ${formatRuntime(Number(max))}`
+  if (max) return `Até ${formatRuntime(Number(max))}`
+  if (min) return `Mais de ${formatRuntime(Number(min))}`
+  return 'Qualquer duração'
 }
 
-export function runtimeLabel(value: string): string {
-  return RUNTIME_OPTIONS.find((o) => o.value === value)?.label ?? `Até ${formatRuntime(Number(value))}`
+// O slider mexe nas duas pontas juntas: as duas passam a ser do usuário
+export function setRuntime(form: SearchForm, runtimeMin: string, runtimeMax: string): SearchForm {
+  return {
+    ...form,
+    runtimeMin,
+    runtimeMax,
+    aiFields: form.aiFields.filter((f) => f !== 'runtimeMin' && f !== 'runtimeMax'),
+  }
 }
 
 
@@ -71,7 +85,7 @@ export type FilterChip =
   | { kind: 'mediaType'; label: string; ai: boolean }
   | { kind: 'genre'; id: number; label: string; ai: boolean }
   | { kind: 'excludeGenre'; id: number; label: string; ai: boolean }
-  | { kind: 'runtimeMax'; label: string; ai: boolean }
+  | { kind: 'runtime'; label: string; ai: boolean }
 
 // Os filtros do formulário como chips da página principal (cada um com X)
 export function filterChips(form: SearchForm, meta: Meta): FilterChip[] {
@@ -87,7 +101,13 @@ export function filterChips(form: SearchForm, meta: Meta): FilterChip[] {
   for (const g of genres.filter((g) => form.excludeGenres.includes(g.id))) {
     chips.push({ kind: 'excludeGenre', id: g.id, label: `sem ${g.name.toLowerCase()}`, ai: ai('excludeGenres') })
   }
-  if (form.runtimeMax) chips.push({ kind: 'runtimeMax', label: runtimeLabel(form.runtimeMax), ai: ai('runtimeMax') })
+  if (form.runtimeMin || form.runtimeMax) {
+    chips.push({
+      kind: 'runtime',
+      label: runtimeRangeLabel(form.runtimeMin, form.runtimeMax),
+      ai: ai('runtimeMin') || ai('runtimeMax'),
+    })
+  }
   return chips
 }
 
@@ -98,8 +118,8 @@ export function removeFilter(form: SearchForm, chip: FilterChip): SearchForm {
       return setGenreFilter(form, { genres: form.genres.filter((g) => g !== chip.id) })
     case 'excludeGenre':
       return setGenreFilter(form, { excludeGenres: form.excludeGenres.filter((g) => g !== chip.id) })
-    case 'runtimeMax':
-      return setField(form, 'runtimeMax', '')
+    case 'runtime':
+      return setRuntime(form, '', '')
     case 'mediaType':
       return setField(form, 'mediaType', '')
   }
@@ -112,17 +132,19 @@ export function clearSearch(form: SearchForm): SearchForm {
 
 // Só os filtros (o "Limpar" dos chips): o texto da busca fica
 export function clearFilters(form: SearchForm): SearchForm {
-  return { ...form, genres: [], genreMatch: 'all', excludeGenres: [], runtimeMax: '', mediaType: '', aiFields: [] }
+  return { ...form, genres: [], genreMatch: 'all', excludeGenres: [], runtimeMin: '', runtimeMax: '', mediaType: '', aiFields: [] }
 }
 
 // Tudo que muda o resultado. Diferente da última busca = mostrar "Buscar de novo"
 export function searchKey(form: SearchForm): string {
-  const { query, genres, genreMatch, excludeGenres, runtimeMax, mediaType, providers, aiMode } = form
-  return JSON.stringify([query.trim(), genres, genreMatch, excludeGenres, runtimeMax, mediaType, providers, aiMode])
+  const { query, genres, genreMatch, excludeGenres, runtimeMin, runtimeMax, mediaType, providers, aiMode } = form
+  return JSON.stringify([
+    query.trim(), genres, genreMatch, excludeGenres, runtimeMin, runtimeMax, mediaType, providers, aiMode,
+  ])
 }
 
 // O usuário mudou um campo: ele deixa de ser da IA
-export function setField(form: SearchForm, field: 'runtimeMax' | 'mediaType', value: string): SearchForm {
+export function setField(form: SearchForm, field: 'mediaType', value: string): SearchForm {
   const next = { ...form, [field]: value, aiFields: form.aiFields.filter((f) => f !== field) }
   // Trocar o formato troca a lista de gêneros
   // Trocar o formato não mexe nos gêneros: a lista é uma só (lib/genres.ts) e o catálogo traduz
@@ -158,6 +180,7 @@ export function userFilters(form: SearchForm): Criteria {
     if (form.genres.length > 1 && form.genreMatch === 'all') filters.genreMatch = 'all'
   }
   if (mine('excludeGenres')) filters.excludeGenres = form.excludeGenres
+  if (mine('runtimeMin')) filters.runtimeMin = Number(form.runtimeMin)
   if (mine('runtimeMax')) filters.runtimeMax = Number(form.runtimeMax)
   return filters
 }
@@ -193,6 +216,10 @@ export function applyAiCriteria(form: SearchForm, criteria: AppliedCriteria, met
       next.excludeGenres = excluded
       next.aiFields.push('excludeGenres')
     }
+  }
+  if (fromAi('runtimeMin') && criteria.runtimeMin) {
+    next.runtimeMin = String(criteria.runtimeMin)
+    next.aiFields.push('runtimeMin')
   }
   if (fromAi('runtimeMax') && criteria.runtimeMax) {
     next.runtimeMax = String(criteria.runtimeMax)
