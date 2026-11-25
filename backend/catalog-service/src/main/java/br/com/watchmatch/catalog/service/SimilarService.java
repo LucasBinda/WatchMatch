@@ -76,9 +76,11 @@ public class SimilarService {
 
         if (targetType == refType) {
             TmdbPage recommended = client.recommendations(refType, ref.id(), page);
-            // As recomendações são do tipo de X: os gêneros pedidos precisam estar nos ids desse tipo
-            Optional<Criteria> typed = GenreMap.forType(criteria, refType);
-            recommendedAvailable(recommended, refType, request.providers(), typed.orElse(null))
+            // As recomendações são do tipo de X: os gêneros pedidos precisam estar nos ids desse tipo.
+            // Gênero que o tipo só tem como palavra-chave (Terror em série) não dá para conferir na ficha:
+            // as recomendações de X já são parecidas com ele, então valem
+            Criteria typed = GenreMap.forType(criteria, refType).map(GenreMap.Typed::criteria).orElse(null);
+            recommendedAvailable(recommended, refType, request.providers(), typed)
                     .forEach(t -> items.putIfAbsent(key(t.mediaType(), t.id()), t));
             hasMore = recommended != null && DiscoverService.hasNextPage(recommended);
         }

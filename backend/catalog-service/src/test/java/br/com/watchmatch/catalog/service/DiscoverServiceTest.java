@@ -30,6 +30,8 @@ import br.com.watchmatch.catalog.domain.TitleType;
 import br.com.watchmatch.catalog.domain.WatchInfo;
 import br.com.watchmatch.catalog.tmdb.TitleMapper;
 import br.com.watchmatch.catalog.tmdb.TmdbClient;
+import br.com.watchmatch.catalog.tmdb.TmdbKeywordPage;
+import br.com.watchmatch.catalog.tmdb.TmdbKeywordPage.TmdbKeyword;
 import br.com.watchmatch.catalog.tmdb.TmdbPage;
 import br.com.watchmatch.catalog.tmdb.TmdbResult;
 
@@ -92,13 +94,29 @@ class DiscoverServiceTest {
     void tipoSemOGeneroPedidoNemEBuscado() {
         when(client.discover(eq(TitleType.MOVIE), anyMap())).thenReturn(new TmdbPage(1, 1, List.of(filme(1, "F1"))));
 
+        var cinemaTv = new DiscoverRequest(Criteria.empty().withGenres(List.of(10770)), List.of(8),
+                SortBy.POPULARITY, null, 1);
+        TitleList lista = service.discover(cinemaTv, 40);
+
+        // O TMDB não tem Cinema TV em séries, nem como palavra-chave: buscar sem ele traria qualquer série
+        verify(client, never()).discover(eq(TitleType.TV), anyMap());
+        assertThat(lista.items()).extracting(TitleSummary::title).containsExactly("F1");
+    }
+
+    @Test
+    void terrorEmSerieBuscaPelaPalavraChaveHorror() {
+        when(client.searchKeyword("horror")).thenReturn(new TmdbKeywordPage(List.of(new TmdbKeyword(315058, "horror"))));
+        when(client.discover(eq(TitleType.MOVIE), anyMap())).thenReturn(new TmdbPage(1, 1, List.of(filme(1, "F1"))));
+        when(client.discover(eq(TitleType.TV), anyMap())).thenReturn(new TmdbPage(1, 1, List.of(serie(2, "S1"))));
+
         var terror = new DiscoverRequest(Criteria.empty().withGenres(List.of(27)), List.of(8), SortBy.POPULARITY,
                 null, 1);
         TitleList lista = service.discover(terror, 40);
 
-        // O TMDB não tem Terror em séries: buscar sem o gênero traria qualquer série
-        verify(client, never()).discover(eq(TitleType.TV), anyMap());
-        assertThat(lista.items()).extracting(TitleSummary::title).containsExactly("F1");
+        verify(client).discover(eq(TitleType.MOVIE), argThat(p -> "27".equals(p.get("with_genres"))));
+        verify(client).discover(eq(TitleType.TV),
+                argThat(p -> !p.containsKey("with_genres") && "315058".equals(p.get("with_keywords"))));
+        assertThat(lista.items()).extracting(TitleSummary::title).containsExactly("F1", "S1");
     }
 
     @Test

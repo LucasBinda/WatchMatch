@@ -62,14 +62,27 @@ public class DiscoverService {
         boolean hasMore = false;
 
         for (TitleType type : types) {
-            // Cada tipo com os seus ids de gênero; tipo impossível (Terror em séries) nem é buscado
-            Optional<Criteria> criteria = GenreMap.forType(request.criteria(), type);
-            if (criteria.isEmpty()) {
+            // Cada tipo com os seus ids de gênero; tipo impossível (Cinema TV em séries) nem é buscado
+            Optional<GenreMap.Typed> typed = GenreMap.forType(request.criteria(), type);
+            if (typed.isEmpty()) {
                 continue;
             }
-            var typed = new DiscoverRequest(criteria.get(), request.providers(), request.sortBy(),
+            // Gênero que o tipo só tem como palavra-chave (Terror em série → "horror"): a palavra vale como
+            // o gênero, e as palavras-chave da IA ficam de fora (o TMDB não mistura "e" com "ou" nelas)
+            List<Integer> withKeywords = keywordIds;
+            boolean allKeywords = false;
+            if (typed.get().hasGenreKeywords()) {
+                withKeywords = keywords.ids(typed.get().keywords());
+                if (withKeywords.isEmpty()) {
+                    continue;
+                }
+                allKeywords = typed.get().allKeywords();
+            }
+            List<Integer> withoutKeywords = keywords.ids(typed.get().excludeKeywords());
+            var typedRequest = new DiscoverRequest(typed.get().criteria(), request.providers(), request.sortBy(),
                     request.mediaType(), request.page());
-            TmdbPage page = client.discover(type, queryBuilder.build(typed, type, keywordIds));
+            TmdbPage page = client.discover(type,
+                    queryBuilder.build(typedRequest, type, withKeywords, allKeywords, withoutKeywords));
             perType.add(toSummaries(page, type));
             hasMore |= hasNextPage(page);
         }

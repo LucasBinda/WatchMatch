@@ -86,9 +86,11 @@ sempre zera a busca nas plataformas do usuário. Palavra sem correspondência é
 **Gêneros de filme e de série.** O TMDB tem uma lista de gêneros para filme e outra para série, com ids
 diferentes. O site usa uma lista só (ids de filme, e os de série para gêneros que só existem em série), e o
 catalog-service (`GenreMap`) traduz por tipo: Ficção científica 878 e Fantasia 14 viram Sci-Fi & Fantasy 10765 em
-série; Ação 28 e Aventura 12 viram Action & Adventure 10759; Guerra 10752 vira War & Politics 10768. O tipo que não
-tem o gênero pedido (Terror e Romance em séries; Reality e Kids em filmes) não é buscado, porque buscar sem o gênero
-traria qualquer título. Na tela, esses gêneros aparecem esmaecidos no formato que não os tem, e trocar o formato
+série; Ação 28 e Aventura 12 viram Action & Adventure 10759; Guerra 10752 vira War & Politics 10768. Terror,
+Romance, Thriller, História e Música não são gênero em série no TMDB: lá viram as palavras-chave "horror", "romance",
+"thriller", "history" e "musical" (sem isso, "série de terror" não achava nenhuma série). Kids vira Família em filme.
+O tipo que não tem o gênero nem como palavra-chave (Cinema TV em séries; Reality em filmes) não é buscado, porque
+buscar sem o gênero traria qualquer título. Na tela, esses gêneros aparecem esmaecidos no formato que não os tem, e trocar o formato
 nunca apaga a seleção.
 
 **Duração conferida pela ficha.** O filtro de duração do TMDB (`with_runtime`) é frouxo: o eval achou

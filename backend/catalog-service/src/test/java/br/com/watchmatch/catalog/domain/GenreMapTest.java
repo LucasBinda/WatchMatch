@@ -32,50 +32,78 @@ class GenreMapTest {
     }
 
     @Test
-    void qualquerUmTiraSoOQueOTipoNaoTem() {
+    void qualquerUmFicaComOGeneroQueOTipoTem() {
+        // O TMDB não junta gênero e palavra-chave num "ou": vale Comédia, e Terror fica de fora
         var terrorOuComedia = Criteria.empty().withGenres(List.of(27, 35));
 
-        assertThat(GenreMap.forType(terrorOuComedia, TitleType.TV)).get()
-                .extracting(Criteria::genres).isEqualTo(List.of(35));
+        var serie = GenreMap.forType(terrorOuComedia, TitleType.TV).orElseThrow();
+
+        assertThat(serie.criteria().genres()).containsExactly(35);
+        assertThat(serie.keywords()).isEmpty();
     }
 
     @Test
-    void soGeneroQueOTipoNaoTemEhImpossivel() {
-        // Buscar séries sem o filtro de gênero traria qualquer série
-        assertThat(GenreMap.forType(Criteria.empty().withGenres(List.of(27)), TitleType.TV)).isEmpty();
+    void terrorEmSerieViraPalavraChave() {
+        // Sem isso, "série de terror" não achava nenhuma série
+        var serie = GenreMap.forType(Criteria.empty().withGenres(List.of(27)), TitleType.TV).orElseThrow();
+
+        assertThat(serie.criteria().genres()).isEmpty();
+        assertThat(serie.keywords()).containsExactly("horror");
+        // Em filme, Terror é gênero de verdade
+        assertThat(GenreMap.forType(Criteria.empty().withGenres(List.of(27)), TitleType.MOVIE).orElseThrow()
+                .keywords()).isEmpty();
     }
 
     @Test
-    void todosOsGenerosComUmQueOTipoNaoTemEhImpossivel() {
+    void generoSemPalavraChaveEhImpossivel() {
+        // Cinema TV não existe em série nem como palavra-chave: buscar sem ele traria qualquer série
+        assertThat(GenreMap.forType(Criteria.empty().withGenres(List.of(10770)), TitleType.TV)).isEmpty();
+    }
+
+    @Test
+    void todosOsGenerosJuntaGeneroEPalavraChave() {
         var terrorEComedia = Criteria.empty().withGenres(List.of(27, 35)).withGenreMatch("all");
 
-        assertThat(GenreMap.forType(terrorEComedia, TitleType.TV)).isEmpty();
-        assertThat(GenreMap.forType(terrorEComedia, TitleType.MOVIE)).get()
-                .extracting(Criteria::genres).isEqualTo(List.of(27, 35));
+        var serie = GenreMap.forType(terrorEComedia, TitleType.TV).orElseThrow();
+        assertThat(serie.criteria().genres()).containsExactly(35);
+        assertThat(serie.keywords()).containsExactly("horror");
+        assertThat(serie.allKeywords()).isTrue();
+
+        assertThat(GenreMap.forType(terrorEComedia, TitleType.MOVIE).orElseThrow().criteria().genres())
+                .containsExactly(27, 35);
+    }
+
+    @Test
+    void terrorProibidoEmSerieViraPalavraChaveProibida() {
+        var semTerror = Criteria.empty().withExcludeGenres(List.of(27));
+
+        assertThat(GenreMap.forType(semTerror, TitleType.TV).orElseThrow().excludeKeywords()).containsExactly("horror");
     }
 
     @Test
     void faroesteEFiccaoEmSerieComTodos() {
         var criteria = Criteria.empty().withGenres(List.of(37, 878)).withGenreMatch("all");
 
-        assertThat(GenreMap.forType(criteria, TitleType.TV)).get()
-                .extracting(Criteria::genres).isEqualTo(List.of(37, 10765));
+        assertThat(GenreMap.forType(criteria, TitleType.TV).orElseThrow().criteria().genres())
+                .containsExactly(37, 10765);
     }
 
     @Test
     void proibidoQueOTipoNaoTemSaiEPedidoVenceProibido() {
         // Pediu Ação, proibiu Aventura e Terror. Em série: Ação e Aventura são o mesmo gênero (vale o pedido),
-        // e Terror não existe
+        // e Terror não é gênero (vira palavra-chave proibida, conferida no teste acima)
         var criteria = Criteria.empty().withGenres(List.of(28)).withExcludeGenres(List.of(12, 27));
 
         var serie = GenreMap.forType(criteria, TitleType.TV).orElseThrow();
 
-        assertThat(serie.genres()).containsExactly(10759);
-        assertThat(serie.excludeGenres()).isEmpty();
+        assertThat(serie.criteria().genres()).containsExactly(10759);
+        assertThat(serie.criteria().excludeGenres()).isEmpty();
     }
 
     @Test
     void semGeneroNaoMudaNada() {
-        assertThat(GenreMap.forType(Criteria.empty(), TitleType.TV)).contains(Criteria.empty());
+        var serie = GenreMap.forType(Criteria.empty(), TitleType.TV).orElseThrow();
+        assertThat(serie.criteria()).isEqualTo(Criteria.empty());
+        assertThat(serie.keywords()).isEmpty();
     }
 }

@@ -62,6 +62,17 @@ class DiscoverQueryBuilderTest {
     }
 
     @Test
+    void palavrasQueFazemAsVezesDeGeneroComTodosViramEEProibidasViramWithout() {
+        var request = new DiscoverRequest(Criteria.empty(), List.of(8));
+
+        Map<String, String> params = builder.build(request, TitleType.TV, List.of(315058, 9840), true, List.of(316362));
+
+        assertThat(params)
+                .containsEntry("with_keywords", "315058,9840")
+                .containsEntry("without_keywords", "316362");
+    }
+
+    @Test
     void qualquerUmContinuaComOPadrao() {
         var criteria = Criteria.empty().withGenres(List.of(37, 878)).withGenreMatch("any");
 

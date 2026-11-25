@@ -13,6 +13,13 @@ public class DiscoverQueryBuilder {
 
     // keywordIds: as palavras-chave já traduzidas para ids do TMDB (o TMDB não filtra por texto)
     public Map<String, String> build(DiscoverRequest request, TitleType type, List<Integer> keywordIds) {
+        return build(request, type, keywordIds, false, List.of());
+    }
+
+    // allKeywords: o título precisa ter todas as palavras (gêneros que viraram palavra-chave com "todos");
+    // withoutKeywordIds: palavras proibidas (gênero proibido que o tipo só tem como palavra-chave)
+    public Map<String, String> build(DiscoverRequest request, TitleType type, List<Integer> keywordIds,
+            boolean allKeywords, List<Integer> withoutKeywordIds) {
         Map<String, String> params = new HashMap<>();
         params.put("watch_region", "BR");
         params.put("with_watch_providers", joinWithPipe(request.providers()));
@@ -46,9 +53,16 @@ public class DiscoverQueryBuilder {
             params.put("with_original_language", criteria.originalLanguage());
         }
 
-        // "|" = qualquer uma das palavras: "E" entre todas quase sempre zera a busca
+        // "|" = qualquer uma das palavras: "E" entre todas quase sempre zera a busca. "," só quando as
+        // palavras fazem as vezes de gêneros marcados com "todos" (terror E romance, em série)
         if (keywordIds != null && !keywordIds.isEmpty()) {
-            params.put("with_keywords", joinWithPipe(keywordIds));
+            params.put("with_keywords", allKeywords
+                    ? keywordIds.stream().map(String::valueOf).collect(Collectors.joining(","))
+                    : joinWithPipe(keywordIds));
+        }
+
+        if (withoutKeywordIds != null && !withoutKeywordIds.isEmpty()) {
+            params.put("without_keywords", joinWithPipe(withoutKeywordIds));
         }
 
         // Filme e série guardam a data com nomes diferentes no TMDB
