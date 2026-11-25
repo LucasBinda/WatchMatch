@@ -10,7 +10,7 @@ Backend em **microsserviços**, orquestrados com Docker Compose. Arquitetura com
 | `recommendation-service/` | Orquestra o fluxo de recomendação |
 | `llm-service/` | Integração com o **Groq** (intenção → critérios; rerank + justificativas) |
 | `catalog-service/` | Integração com o **TMDB** (catálogo e "onde assistir") |
-| `feedback-service/` | Feedback do usuário e métricas (C3) |
+| `feedback-service/` | Feedback do usuário e métricas (planejado, não implementado) |
 
 Linguagem padrão: **Java 21 + Spring Boot 4**. Outras linguagens são permitidas desde que o serviço cumpra seu contrato em `contracts/` e as convenções da seção 3 da arquitetura.
 
@@ -24,4 +24,4 @@ e os títulos vêm na ordem do catálogo.
 
 ## Ainda falta
 
-- C3: feedback-service com Postgres.
+- feedback-service com Postgres ("Gostei" / "Não gostei" e métricas de aceitação).

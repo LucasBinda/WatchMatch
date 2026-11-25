@@ -9,7 +9,7 @@ As três APIs citadas no relatório estão no ar e exigem chave. Teste sem chave
 | Watchmode | `GET https://api.watchmode.com/v1/sources/` | `401 Please enter a valid API key` |
 
 **Atualização (17/11/2026):** com as chaves do TMDB e do Groq, o site completo rodou no Docker e trouxe títulos
-com plataformas do **BR** (Netflix, Prime Video). A chave do Watchmode não foi criada: ele ficou como extra do C3.
+com plataformas do **BR** (Netflix, Prime Video). A chave do Watchmode não foi criada: ele ficou como possível extensão.
 
 ---
 
@@ -62,7 +62,7 @@ O que o TMDB permite fazer **dentro do WatchMatch**, sem o usuário sair do site
 
 A única coisa que o TMDB **não** fornece é o *deep link* (o endereço do título dentro da plataforma, ex. `netflix.com/title/70305903`).
 
-**Solução no C2:** o botão "Abrir na plataforma" (`watchUrl` no contrato) leva à **busca da própria plataforma** com o nome do título. O catalog-service mantém uma tabela `provider_id → modelo de URL`; plataforma fora da tabela usa o `link` do TMDB.
+**Solução:** o botão "Abrir na plataforma" (`watchUrl` no contrato) leva à **busca da própria plataforma** com o nome do título. O catalog-service mantém uma tabela `provider_id → modelo de URL`; plataforma fora da tabela usa o `link` do TMDB.
 
 | Plataforma | Modelo de URL de busca (testar antes de fixar) |
 | ---------- | ---------------------------------------------- |
@@ -72,7 +72,7 @@ A única coisa que o TMDB **não** fornece é o *deep link* (o endereço do tít
 
 Os ids das plataformas no BR devem ser conferidos na resposta real de `/watch/providers/movie?watch_region=BR` (ex. Netflix = 8, Prime Video = 119).
 
-**C3 (extra):** deep link real via Watchmode, consultado só quando o usuário clica (com cache).
+**Possível extensão:** deep link real via Watchmode, consultado só quando o usuário clica (com cache).
 
 Assistir ao vídeo **dentro** do WatchMatch não é possível com nenhuma API (conteúdo protegido) e está fora do escopo.
 
@@ -97,16 +97,16 @@ Assistir ao vídeo **dentro** do WatchMatch não é possível com nenhuma API (c
 | `llm-service /intent` | `openai/gpt-oss-20b` | Rápido; modo estrito garante o JSON dos critérios |
 | `llm-service /rerank` | `openai/gpt-oss-120b` | Precisa "entender" sinopses; modo estrito |
 
-Cada recomendação = **2 chamadas** ao Groq, o que dá ~500 recomendações/dia no limite de 1.000 req/dia. É suficiente para o C2/C3, mas reforça a necessidade do rate limit no gateway. Os modelos ficam em variável de ambiente para trocar sem mexer no código.
+Cada recomendação = **2 chamadas** ao Groq, o que dá ~500 recomendações/dia no limite de 1.000 req/dia. É suficiente para o projeto, mas reforça a necessidade do rate limit no gateway. Os modelos ficam em variável de ambiente para trocar sem mexer no código.
 
 ---
 
-## Watchmode — "onde assistir" (não usar no C2)
+## Watchmode — "onde assistir" (não usado)
 
 - **Plano gratuito (site oficial):** 2.500 requisições/mês, uso não comercial, **até 3 países**, atribuição obrigatória. Pode cachear por até 30 dias.
 - Consultas com dados "anexados" custam mais de 1 crédito.
 - **Vantagem sobre o TMDB:** deep links direto para o título na plataforma.
-- **Decisão:** o TMDB já cobre "onde assistir" no BR sem limite mensal apertado, e o botão "Abrir na plataforma" usa a busca da plataforma no C2. O Watchmode fica como **extra no C3** para trocar a busca pelo deep link, se a cobertura do BR for confirmada.
+- **Decisão:** o TMDB já cobre "onde assistir" no BR sem limite mensal apertado, e o botão "Abrir na plataforma" usa a busca da plataforma. O Watchmode fica como **possível extensão** para trocar a busca pelo deep link, se a cobertura do BR for confirmada.
 
 ---
 

@@ -1,6 +1,6 @@
 # Arquitetura e plano técnico — WatchMatch
 
-Documento vivo; decisões tomadas em 27/10/2026 para o C2 e refinadas até o C3.
+Registra as decisões técnicas do projeto, tomadas a partir de 27/10/2026 e refinadas ao longo do desenvolvimento.
 
 ## 1. Visão geral
 
@@ -10,25 +10,25 @@ O WatchMatch é um **site independente** (não é extensão da Netflix/Prime). O
 frontend ─▶ gateway ─▶ recommendation-service ─┬─▶ llm-service ─────▶ Groq
                    │                            └─▶ catalog-service ─▶ TMDB
                    ├─▶ catalog-service (detalhes de título)
-                   └─▶ feedback-service ─▶ Postgres (C3)
+                   └─▶ feedback-service ─▶ Postgres (planejado)
 ```
 
 O `llm-service` **não** tem rota pública: só é acessível pela rede interna.
 
 ## 2. Serviços
 
-| Serviço | Responsabilidade | Dono de | Entrega |
+| Serviço | Responsabilidade | Dono de | Situação |
 | ------- | ---------------- | ------- | ------- |
-| **gateway** | Porta única do site: roteamento, rate limit por IP, limite de tamanho do corpo, geração do `X-Request-Id` | nada | C2 |
-| **recommendation-service** | Orquestrador do fluxo de recomendação (seção 4) | nada (stateless) | C2 |
-| **llm-service** | Integração com o Groq: `POST /intent` e `POST /rerank`; prompts versionados; validação do JSON do LLM | chave do Groq | C2 |
-| **catalog-service** | Integração com o TMDB: discover, detalhes, onde assistir, gêneros e plataformas do BR; cache | chave do TMDB | C2 |
-| **feedback-service** | "Gostei"/"Não gostei"/"Vou assistir" e métricas de aceitação | banco Postgres próprio | C3 |
+| **gateway** | Porta única do site: roteamento, rate limit por IP, limite de tamanho do corpo, geração do `X-Request-Id` | nada | Pronto |
+| **recommendation-service** | Orquestrador do fluxo de recomendação (seção 4) | nada (stateless) | Pronto |
+| **llm-service** | Integração com o Groq: `POST /intent` e `POST /rerank`; prompts versionados; validação do JSON do LLM | chave do Groq | Pronto |
+| **catalog-service** | Integração com o TMDB: discover, detalhes, onde assistir, gêneros e plataformas do BR; cache | chave do TMDB | Pronto |
+| **feedback-service** | "Gostei"/"Não gostei"/"Vou assistir" e métricas de aceitação | banco Postgres próprio | Planejado, não implementado |
 
 Princípios:
 
 - Cada serviço é **dono dos seus segredos e dados**; nenhum serviço acessa o banco ou a API externa de outro.
-- Comunicação **síncrona REST/JSON**. Fila (RabbitMQ/Kafka) só se fizer sentido no C3 (ex.: eventos de feedback).
+- Comunicação **síncrona REST/JSON**. Fila (RabbitMQ/Kafka) só se um dia fizer sentido (ex.: eventos de feedback).
 
 ## 3. Linguagens e liberdade de escolha
 
@@ -60,7 +60,9 @@ Cada desenvolvedor **pode escolher outra linguagem** para o serviço que impleme
 
 ### 3.3 Testes de contrato
 
-**Schemathesis** lê o OpenAPI e dispara requisições contra o serviço rodando, verificando se as respostas batem com o contrato — o mesmo teste vale para qualquer linguagem. Roda no GitHub Actions para cada serviço.
+Hoje os contratos são validados com o Redocly (`lint` de cada OpenAPI) e conferidos pelos testes de cada serviço. O
+planejado, ainda não feito, é o **Schemathesis**: ele lê o OpenAPI e dispara requisições contra o serviço rodando,
+verificando se as respostas batem com o contrato, e o mesmo teste vale para qualquer linguagem.
 
 ## 4. Fluxo de uma recomendação
 
@@ -183,7 +185,7 @@ Rotas públicas (tudo o que não está listado é bloqueado):
 | `POST /api/recommend` | recommendation-service |
 | `GET /api/titles/:type/:id` | catalog-service |
 | `GET /api/meta` | catalog-service (gêneros e plataformas do BR) |
-| `POST /api/feedback` | feedback-service (C3) |
+| `POST /api/feedback` | feedback-service (planejado; hoje responde 404) |
 | `GET /health` | gateway |
 | qualquer outro caminho fora de `/api` | frontend (o site) |
 
@@ -225,7 +227,7 @@ backend/
   recommendation-service/
   llm-service/               (inclui prompts/ versionados)
   catalog-service/
-  feedback-service/          (C3)
+  feedback-service/          (planejado, não existe ainda)
   contracts/                 OpenAPI de cada serviço
   eval/                      casos e script de eval (chama o gateway via HTTP)
   .env.example               GROQ_API_KEY, TMDB_API_KEY
@@ -245,10 +247,9 @@ repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 ### Telas
 
 1. **Home / busca** — campo grande ("O que vamos assistir hoje?"), chips de exemplo e os filtros numa coluna à esquerda, como nos marketplaces (formato, gêneros, duração — slider de mínimo e máximo de 0 a 4h+, com pontas abertas e atalhos —, plataformas assinadas — salvas no `localStorage`, sem cadastro — e o modo da IA). No celular a coluna vira a janela do botão "Filtros". Os cards mostram o pôster em destaque, com título, ano, duração e nota sobre ele. Os gêneros aceitam vários de uma vez, com "todos" (padrão: faroeste **e** ficção científica, vira `with_genres=37,878` no TMDB) ou "qualquer um" (`37|878`). Os gêneros que a IA entende são sempre "qualquer um": "comédia romântica" vira comédia ou romance. Cada gênero também pode ser proibido (botão ⊘ na lista). Abaixo da barra de busca, os filtros aparecem como chips com X: o X só tira do formulário, e o botão "Buscar de novo" aparece quando algo mudou desde a última busca. Proibido na tela vence o que a IA entender no texto.
-2. **Resultados** — critérios interpretados em chips editáveis ("Entendi: comédia · até 2h · Netflix") e grade de cards com o motivo da IA, logos das plataformas e "Gostei"/"Não gostei"/"Vou assistir".
-3. **Detalhe** (gaveta/modal) — sinopse, elenco, classificação, onde assistir, "mais parecidos".
-4. **Sobre / Privacidade** — limitações, fontes e **atribuição obrigatória ao TMDB e ao JustWatch**.
-5. *(C3, opcional)* "Minha lista" no `localStorage` e página interna com resultados do eval.
+2. **Resultados** — critérios interpretados em chips ("Entendi: comédia · até 2h · Netflix") e grade de cards com o motivo da IA e os logos das plataformas.
+3. **Detalhe** (janela) — sinopse, elenco, classificação e onde assistir, com o botão "Abrir na plataforma".
+4. **Rodapé** — limitações, fontes e **atribuição obrigatória ao TMDB e ao JustWatch**, com o logo do TMDB.
 
 ## 8. Testes e eval
 
@@ -256,7 +257,7 @@ repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 | ----- | ---------- | ----------- |
 | Unitário | JUnit 5 + Mockito (ou equivalente da linguagem) | sanitização, mescla de filtros, parse do LLM, grounding |
 | Integração | `MockRestServiceServer` (Groq/TMDB simulados) | cada serviço isolado contra APIs externas falsas |
-| Contrato | Schemathesis | cada serviço cumpre seu OpenAPI |
+| Contrato | Redocly (lint dos OpenAPI); Schemathesis planejado | cada serviço cumpre seu OpenAPI |
 | Ponta a ponta | Docker Compose + chamadas ao gateway | fluxo completo, incluindo fallback sem LLM |
 
 **Eval do componente de IA** ([backend/eval/](../backend/eval/README.md)): 28 casos em `cases.json` com a frase e o esperado (16 normais, 7 difíceis — gíria, frase vaga, pedido impossível, prompt injection — e 5 de generalização, com sinais implícitos que o prompt não cita). Um script Python chama o gateway e confere o entendimento (critérios que a IA tirou da frase) e o resultado (cada título está na plataforma e respeita os critérios). Dá uma nota em vez de passar ou falhar; cada rodada fica salva em `backend/eval/results/`.
@@ -269,19 +270,14 @@ repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 | Títulos fora do catálogo de candidatos | 0 |
 | Latência por requisição | registrar (p50/p95) |
 
-## 9. Plano até o C2 (30/10/2026)
+## 9. Possíveis extensões
 
-| Dia | Backend | Frontend |
-| --- | ------- | -------- |
-| **28/10** | Contratos OpenAPI; `docker-compose.yml`; gateway Nginx; catalog-service | Projeto, Home, seleção de plataformas, cards usando mock do Prism |
-| **29/10** | llm-service (intent + rerank); recommendation-service com grounding e fallback; testes principais | Integração com o gateway, chips de critérios, gaveta de detalhe |
-| **30/10** | 5–10 casos de eval; ajustes; gravação do vídeo | |
+Ficaram de fora do que foi entregue, por prioridade e prazo:
 
-**Roteiro do vídeo:** problema → arquitetura (diagrama) → 3 buscas ao vivo → critérios interpretados → derrubar o llm-service e mostrar o fallback → eval rodando.
-
-**Fica para o C3:** feedback-service + Postgres, Playwright, Watchmode, PWA, possível reescrita de um serviço em outra linguagem (ex.: catalog-service em C++).
-
-## 10. Pendências
-
-- Adicionar o professor como colaborador no GitHub (exigência do C2).
-- Criar as chaves gratuitas do Groq e do TMDB e preencher o `.env` (nunca versionar).
+- **feedback-service + Postgres:** "Gostei" / "Não gostei" / "Vou assistir" e métricas de aceitação das sugestões.
+  O gateway já reserva a rota `POST /api/feedback`.
+- **"Minha lista"** salva no navegador (a aba aparece como "em breve").
+- **Testes de contrato com Schemathesis** e **testes de ponta a ponta com Playwright**, num CI no GitHub Actions.
+- **Deep link via Watchmode** no botão "Abrir na plataforma".
+- **Endereço fixo** com domínio próprio e túnel nomeado ([DEPLOY.md](DEPLOY.md#endereço-fixo-opcional)).
+- PWA e reescrever um serviço em outra linguagem (ex.: catalog-service em C++), aproveitando os contratos OpenAPI.

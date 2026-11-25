@@ -58,4 +58,4 @@ tokens para colar no `@theme` do `index.css` (a paleta padrão, que é o que tod
 
 ## Pendências
 
-- Aba "Minha lista" (C3, salva no navegador).
+- Aba "Minha lista" (salva no navegador).

@@ -71,3 +71,36 @@ Se a porta 5173 estiver ocupada (outro `npm run dev` aberto), o Vite usa a 5174:
 | Build e tipos do frontend | `cd frontend && npm run build` |
 | Lint do frontend | `cd frontend && npm run lint` |
 | Lint dos contratos OpenAPI | `cd backend/contracts && npx @redocly/cli lint` |
+| Eval da IA (com o Docker no ar) | `python3 backend/eval/run_eval.py --label teste` (ver [backend/eval/](../backend/eval/README.md)) |
+
+## 5. Publicar na internet
+
+O site de produção roda neste computador, com o mesmo Compose, e um túnel grátis da Cloudflare o publica com HTTPS,
+sem abrir porta no roteador. Detalhes, motivos e limites em [DEPLOY.md](DEPLOY.md).
+
+| Ação | Comando |
+| ---- | ------- |
+| Subir (ou atualizar) a produção | `deploy/deploy.sh` |
+| Derrubar a produção, inclusive o túnel | `deploy/deploy.sh parar` |
+| Ver o endereço do túnel de novo | `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs tunnel \| grep trycloudflare` |
+
+Derrube o Compose de casa antes de subir a produção (`docker compose down`): as duas usam faixas de rede diferentes.
+O `deploy.sh` faz o build, sobe tudo e, no fim, mostra o endereço público do túnel, algo como
+`https://palavras-aleatorias.trycloudflare.com`.
+
+### Link fixo pelo GitHub Pages
+
+O endereço do túnel muda toda vez que ele reinicia. Para ter um link que não muda, usamos o **GitHub Pages** do
+repositório como redirecionador:
+
+**<https://lucasbinda.github.io/notComplete/>**
+
+- É uma página só ([deploy/link.html](../deploy/link.html)) publicada na branch `gh-pages`. Ela confere se o site
+  responde e redireciona para o endereço atual do túnel; com o site desligado, mostra que está fora do ar.
+- O `deploy.sh` atualiza essa página sozinho, e só quando o endereço do túnel ou a `link.html` mudam (uma
+  publicação por apresentação, não a cada comando). Derrubar não publica nada.
+- Na primeira vez, ative o GitHub Pages para a branch `gh-pages` (Settings → Pages, ou o comando em
+  [DEPLOY.md](DEPLOY.md#link-fixo-uma-vez-só)).
+- Depois de uma publicação, o link leva de 1 a 10 minutos para apontar para o endereço novo (build do Pages e cache).
+- O site continua dependendo deste computador **ligado, conectado e sem suspender**.
+

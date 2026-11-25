@@ -29,7 +29,7 @@ Sem cadastro: as plataformas escolhidas ficam salvas só no navegador. A IA nunc
 | Infra | Docker Compose; gateway Nginx na frente de tudo, com rate limit por IP |
 | Deploy | Mesmo Compose, publicado com HTTPS por um túnel grátis da Cloudflare; link fixo em https://lucasbinda.github.io/notComplete/ ([docs/DEPLOY.md](docs/DEPLOY.md)) |
 
-No relatório do C1 a stack era só uma previsão (Node.js ou Python, Next.js). A escolha final e os motivos
+No começo a stack era só uma previsão (Node.js ou Python, Next.js). A escolha final e os motivos
 estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 > Catálogos oficiais da Netflix/Prime **não** serão baixados nem scrapados (ToS / direitos). Usamos fontes de metadados e “onde assistir” legítimas.
@@ -48,9 +48,13 @@ Links das chaves, como subir cada parte separada e como rodar os testes: **[docs
 ```
 frontend/            # site em React (ver frontend/README.md)
 backend/             # microsserviços, contratos OpenAPI e .env das chaves (ver backend/README.md)
-docs/                # relatórios, arquitetura e guia de como rodar
+docs/                # arquitetura, APIs, como rodar, deploy, impacto e IA responsável
 docker-compose.yml   # sobe tudo com um comando
 ```
+
+Documentos principais: [arquitetura](docs/ARQUITETURA.md), [como rodar](docs/COMO_RODAR.md),
+[deploy](docs/DEPLOY.md), [análise de impacto](docs/ANALISE_IMPACTO.md), [IA responsável](docs/IA_RESPONSAVEL.md),
+[eval da IA](backend/eval/README.md) e [registro de uso de IA no desenvolvimento](docs/prompts/README.md).
 
 ## Colaboradores
 
