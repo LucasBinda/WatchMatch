@@ -11,7 +11,6 @@ import { FilterPanel } from './components/FilterPanel'
 import { FiltersDialog } from './components/FiltersDialog'
 import { SearchBox } from './components/SearchBox'
 import { TitleDetails } from './components/TitleDetails'
-import { paletteToolEnabled } from './lib/palettes'
 import { loadAiMode, loadPageSize, loadProviders, saveAiMode, savePageSize, saveProviders } from './lib/preferences'
 import { applyAiCriteria, filterChips, searchKey, userFilters, type SearchForm } from './lib/searchForm'
 import type { Meta, PageSize, Recommendation, RecommendRequest, RecommendResponse } from './types'
@@ -210,7 +209,7 @@ export default function App() {
 
       <Footer />
       <TitleDetails title={selected} onClose={() => setSelected(null)} />
-      {paletteToolEnabled() && <PaletteSwitcher />}
+      <PaletteSwitcher />
     </div>
   )
 }

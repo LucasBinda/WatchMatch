@@ -51,12 +51,11 @@ src/
 
 ## Trocar a paleta de cores
 
-Todas as cores passam pelos tokens `--color-*` do `src/index.css`. Em desenvolvimento (ou com `?paletas` na URL)
-aparece um botão redondo no canto inferior direito: ele troca a paleta na hora, entre 13 prontas ou uma gerada
-ao acaso, e lembra a escolha neste navegador. Gostou de uma? "Copiar cores" copia os tokens para colar no
-`@theme` do `index.css`, que é o que o público vê.
+Todas as cores passam pelos tokens `--color-*` do `src/index.css`. O botão redondo no canto inferior direito
+aparece para todos: troca a paleta na hora, entre 13 prontas ou uma gerada ao acaso, lembra a escolha neste
+navegador e troca também a cor do favicon. Em desenvolvimento ele mostra ainda "Copiar cores", que copia os
+tokens para colar no `@theme` do `index.css` (a paleta padrão, que é o que todo mundo vê primeiro).
 
 ## Pendências
 
-- Logo oficial do TMDB no rodapé (exigência dos termos da API).
 - Aba "Minha lista" (C3, salva no navegador).

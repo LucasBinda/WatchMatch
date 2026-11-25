@@ -1,4 +1,4 @@
-// Paletas de cor trocadas ao vivo (seletor de paletas, só em desenvolvimento ou com ?paletas na URL).
+// Paletas de cor trocadas ao vivo pelo seletor de paletas (botão no canto inferior direito, para todos).
 // Todas as cores do site passam pelos tokens --color-* do index.css; aqui só trocamos os valores.
 // Só cores: as fontes são sempre as do index.css, para a troca não mudar o tamanho dos textos.
 
@@ -122,9 +122,23 @@ export function generatePalette(): Palette {
 
 const STORAGE_KEY = 'watchmatch.palette'
 
+// O favicon é o mesmo símbolo do cabeçalho (o "play" da lucide), e muda de cor junto com a paleta.
+// public/favicon.svg é a versão fixa, com as cores da paleta padrão
+const PLAY_PATH = 'M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z'
+
+function setFavicon(page: string, brand: string) {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="${page}"/>` +
+    `<path transform="translate(4 4)" d="${PLAY_PATH}" fill="${brand}" stroke="${brand}" stroke-width="2" ` +
+    `stroke-linejoin="round"/></svg>`
+  const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+  if (link) link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
 export function applyPalette(palette: Palette) {
   const root = document.documentElement
   for (const token of TOKENS) root.style.setProperty(`--color-${token}`, palette.colors[token])
+  setFavicon(palette.colors.page, palette.colors.brand)
   root.style.colorScheme = palette.scheme
 }
 
@@ -163,15 +177,11 @@ export function clearPalette() {
     const value = css.getPropertyValue(`--color-${token}`).trim()
     if (value) root.style.setProperty(`--color-${token}`, value)
   }
+  setFavicon(css.getPropertyValue('--color-page').trim(), css.getPropertyValue('--color-brand').trim())
 }
 
 // O bloco @theme para colar no index.css quando gostar de uma paleta
 export function paletteToCss(palette: Palette): string {
   const lines = TOKENS.map((t) => `  --color-${t}: ${palette.colors[t]};`)
   return [`/* ${palette.name} */`, ...lines].join('\n')
-}
-
-// Aparece em desenvolvimento ou com ?paletas na URL (dá para mostrar a outra pessoa no site publicado)
-export function paletteToolEnabled(): boolean {
-  return import.meta.env.DEV || new URLSearchParams(window.location.search).has('paletas')
 }

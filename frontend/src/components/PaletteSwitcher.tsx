@@ -12,8 +12,8 @@ import {
   type Palette,
 } from '../lib/palettes'
 
-// Ferramenta de escolha de paleta: troca as cores do site na hora. Não aparece para o público
-// (só em desenvolvimento ou com ?paletas na URL)
+// Seletor de paleta: troca as cores do site na hora e lembra a escolha neste navegador. Aparece para todos;
+// o "Copiar cores" (tokens para colar no index.css) só faz sentido para quem desenvolve, e só aparece em dev
 export function PaletteSwitcher() {
   const [open, setOpen] = useState(false)
   const [current, setCurrent] = useState<Palette | null>(loadPalette)
@@ -101,14 +101,16 @@ export function PaletteSwitcher() {
       </div>
 
       <div className="mt-2 flex gap-1.5">
-        <button
-          type="button"
-          onClick={copy}
-          disabled={!current}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-xs text-muted transition hover:text-ink disabled:opacity-50"
-        >
-          <Copy className="size-3.5" /> {copied ? 'Copiado' : 'Copiar cores'}
-        </button>
+        {import.meta.env.DEV && (
+          <button
+            type="button"
+            onClick={copy}
+            disabled={!current}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-xs text-muted transition hover:text-ink disabled:opacity-50"
+          >
+            <Copy className="size-3.5" /> {copied ? 'Copiado' : 'Copiar cores'}
+          </button>
+        )}
         <button
           type="button"
           onClick={reset}
