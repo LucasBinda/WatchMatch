@@ -1,106 +1,109 @@
 # Deploy
 
-O WatchMatch roda numa VM com o mesmo Docker Compose de casa, mais um Caddy na frente para o HTTPS.
+O WatchMatch roda no seu computador com o mesmo Docker Compose de casa, e um túnel grátis da Cloudflare o
+publica na internet com HTTPS.
 
 ```
-internet ──443──► Caddy (HTTPS) ──► gateway (Nginx, rate limit) ──► frontend e serviços
+visitante ──HTTPS──► Cloudflare ◄──túnel── cloudflared ──► gateway (Nginx, rate limit) ──► frontend e serviços
+                                            (no seu computador)
 ```
 
 | Peça | Escolha | Por quê |
 | ---- | ------- | ------- |
-| Onde | VM no Azure for Students | US$ 100 de crédito pelo GitHub Student Pack, sem cartão. O Render grátis não serve, porque um serviço grátis não recebe tráfego da rede privada e dorme depois de 15 min. O Railway é pago depois de 30 dias |
-| HTTPS | Caddy + nome grátis do DuckDNS | O Caddy pega o certificado do Let's Encrypt sozinho e renova sozinho |
-| Atualizar | `deploy/deploy.sh` na VM | `git pull` + build + `up`, sem CI para configurar |
+| Onde | O seu computador, com o Docker | Não deu para usar o Azure for Students. O Cloudflare Containers não tem plano grátis (exige o Workers Paid, de US$ 5 por mês), o Render grátis dorme depois de 15 min e não aceita tráfego da rede privada, e o Railway é pago depois de 30 dias |
+| Publicar | Túnel rápido da Cloudflare (`cloudflared`) | Grátis e sem conta. O túnel sai do computador para a Cloudflare, então não abre porta no roteador. A Cloudflare cuida do HTTPS |
+| Subir | `deploy/deploy.sh` | Faz o build, sobe tudo, mostra o endereço público e atualiza o link fixo |
+| Link fixo | GitHub Pages: **https://lucasbinda.github.io/notComplete/** | O endereço do túnel muda a cada subida; este não. É uma página que redireciona para o endereço do dia |
 
-Arquivos: [docker-compose.prod.yml](../docker-compose.prod.yml), [deploy/Caddyfile](../deploy/Caddyfile),
-[deploy/real-ip.conf](../deploy/real-ip.conf), [deploy/setup-vm.sh](../deploy/setup-vm.sh) e
-[deploy/deploy.sh](../deploy/deploy.sh).
+Arquivos: [docker-compose.prod.yml](../docker-compose.prod.yml), [deploy/real-ip.conf](../deploy/real-ip.conf),
+[deploy/deploy.sh](../deploy/deploy.sh) e [deploy/link.html](../deploy/link.html).
 
 ## O que muda na produção
 
-- **Só o Caddy abre portas (80 e 443).** O gateway deixa de abrir a 8080, e o HTTP redireciona para HTTPS.
-- **IP real no rate limit.** Atrás do Caddy, o gateway veria só o IP dele, e o site inteiro dividiria
-  as 6 buscas por minuto. O `real-ip.conf` faz o Nginx usar o `X-Forwarded-For`, mas só vindo da rede
-  interna do Compose. O Caddy descarta o `X-Forwarded-For` que o visitante mandar, então não dá para
-  burlar o limite trocando esse cabeçalho.
-- **Teto de memória por container.** Os três serviços Java, o Caddy e os dois Nginx somam até ~1,9 GB.
-  Parado, tudo usa ~510 MB. A JVM pode usar até 75% do teto do container.
-- **Logs giram** (3 arquivos de 10 MB por container) e os containers voltam sozinhos se a VM reiniciar.
+- **Nenhuma porta aberta.** O gateway deixa de abrir a 8080. O único caminho de fora é o túnel.
+- **Endereço sorteado, link fixo.** O túnel rápido ganha um endereço `https://<palavras>.trycloudflare.com`,
+  que muda toda vez que o container do túnel reinicia. O `deploy.sh` publica esse endereço numa página da
+  branch `gh-pages`, e o GitHub Pages a serve em **https://lucasbinda.github.io/notComplete/**, que
+  redireciona para o endereço do dia. É esse link que vai para quem for avaliar. Ele ainda depende do
+  computador ligado: com o site fora do ar, o link abre uma página de erro da Cloudflare.
+- **IP real no rate limit.** Atrás do túnel, o gateway veria só o IP do cloudflared, e o site inteiro
+  dividiria as 6 buscas por minuto. O `real-ip.conf` faz o Nginx usar o `CF-Connecting-IP`, que a
+  Cloudflare preenche com o IP do visitante e sobrescreve se ele mandar um falso. O Nginx só aceita esse
+  cabeçalho vindo da rede interna do Compose.
+- **Teto de memória por container.** Os três serviços Java, o túnel e os dois Nginx somam até ~1,9 GB.
+  A JVM pode usar até 75% do teto do container.
+- **Logs giram** (3 arquivos de 10 MB por container). Os containers voltam sozinhos quando o Docker
+  reinicia, a não ser que você os tenha parado.
 
 ## Passo a passo
 
-### 1. Conta e VM no Azure
+### 1. Chaves (uma vez só)
 
-1. Ative o Azure for Students em <https://azure.microsoft.com/free/students> com o e-mail da FAESA (ou
-   pelo GitHub Student Pack).
-2. No portal, crie uma **máquina virtual**:
-   - imagem **Ubuntu Server 24.04 LTS**;
-   - tamanho **B2s** (2 vCPU, 4 GB), ou outro com 4 GB. Com 2 GB até roda, mas o build fica lento e
-     depende do swap;
-   - autenticação por **chave SSH** (o portal gera e baixa a chave);
-   - portas de entrada: **SSH (22), HTTP (80) e HTTPS (443)**;
-   - em Rede, deixe o **IP público como Estático**, para o endereço não mudar quando a VM reiniciar.
-3. Anote o IP público da VM.
-
-Confira o preço do tamanho escolhido na tela de criação: a região muda o valor, e o Brazil South
-costuma ser mais caro que o East US. O crédito aparece em "Cost Management".
-
-### 2. Nome com HTTPS (DuckDNS)
-
-1. Entre em <https://www.duckdns.org> e crie um subdomínio, por exemplo `watchmatch`.
-2. Em "current ip", coloque o IP público da VM e clique em "update ip".
-
-O site vai ficar em `https://watchmatch.duckdns.org`. Como o IP é estático, não precisa atualizar de novo.
-
-### 3. Preparar a VM (uma vez só)
-
-```bash
-ssh -i chave-baixada.pem azureuser@IP-DA-VM
-```
-
-```bash
-git clone https://github.com/LucasBinda/notComplete.git && cd notComplete
-```
-
-```bash
-sudo deploy/setup-vm.sh
-```
-
-Esse script instala o Docker, cria 2 GB de swap e libera só as portas 22, 80 e 443. Depois saia do SSH
-e entre de novo, para o Docker funcionar sem `sudo`.
-
-### 4. Chaves e domínio (uma vez só)
-
-As chaves ficam só na VM e nunca vão para o Git:
+As chaves ficam só no `backend/.env`, que nunca vai para o Git. Se o Compose de casa já funciona, esse
+arquivo já existe. Se não:
 
 ```bash
 cp backend/.env.example backend/.env && nano backend/.env
 ```
 
-```bash
-echo DOMAIN=watchmatch.duckdns.org > .env
-```
+### 2. Subir
 
-### 5. Subir
+Derrube antes o Compose de casa, porque a rede da produção usa outra faixa de IP:
+
+```bash
+docker compose down
+```
 
 ```bash
 deploy/deploy.sh
 ```
 
-Na primeira vez, o build leva uns 10 minutos. O Caddy pede o certificado assim que sobe, e o Let's
-Encrypt precisa achar o domínio apontando para a VM, por isso o DuckDNS vem antes. Para conferir:
+Na primeira vez, o build leva uns 10 minutos. No fim, o script mostra o endereço:
 
-```bash
-curl -I https://watchmatch.duckdns.org/health
+```
+==> Pronto: https://exemplo-palavras-aleatorias.trycloudflare.com
 ```
 
-### Atualizar depois
-
-Faça o push para a `main` no seu computador e, na VM:
+Para conferir de outro aparelho (o celular no 4G, por exemplo):
 
 ```bash
-cd notComplete && deploy/deploy.sh
+curl -I https://<endereço>/health
 ```
+
+### Link fixo (uma vez só)
+
+Na primeira subida o `deploy.sh` cria a branch `gh-pages` com a página de redirecionamento. Depois disso, ative
+o GitHub Pages para essa branch (ou em Settings → Pages → Branch `gh-pages`, pasta `/`):
+
+```bash
+gh api -X POST repos/LucasBinda/notComplete/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'
+```
+
+A cada subida o link passa a apontar para o endereço novo em 1 ou 2 minutos (o GitHub Pages guarda a página
+em cache por até 10 minutos). O `deploy.sh` só envia a branch `gh-pages`: não troca de branch nem mexe na
+pasta de trabalho ou na `main`. Para subir sem atualizar o link: `PUBLICAR_LINK=0 deploy/deploy.sh`.
+
+### Enquanto estiver no ar
+
+- O computador precisa ficar **ligado, conectado e sem suspender**.
+- O túnel rápido aceita até 200 pedidos ao mesmo tempo e não tem garantia de disponibilidade. Para uma
+  apresentação, isso sobra.
+
+### Achar o endereço de novo
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs tunnel | grep trycloudflare
+```
+
+### Atualizar
+
+O script sobe o código que está na pasta. Para publicar a versão da `main`:
+
+```bash
+git pull && deploy/deploy.sh
+```
+
+O `up` só recria os containers que mudaram. Se o túnel não mudou, o endereço continua o mesmo.
 
 ### Ver o que está acontecendo
 
@@ -112,30 +115,24 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail 5
 docker stats --no-stream
 ```
 
-## Testar a produção em casa
-
-O `DOMAIN=localhost` faz o Caddy usar um certificado próprio (o navegador avisa que não é confiável).
-Derrube antes o Compose de casa, porque a rede da produção usa outra faixa de IP:
+### Tirar do ar e voltar ao de casa
 
 ```bash
-docker compose down
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 ```
 
 ```bash
-DOMAIN=localhost docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
+docker compose up -d
 ```
 
-Abra <https://localhost>. Para voltar ao de casa, rode `down` com os dois arquivos e depois `docker compose up -d`.
+## Endereço fixo (opcional)
 
-Testado assim em 23/11/2026, com estes resultados:
-- HTTPS 200, e o HTTP redireciona com 308;
-- a 8080 está fechada;
-- o `X-Forwarded-For` falso foi ignorado, e o rate limit recusou a 6ª busca seguida;
-- uma busca de ponta a ponta voltou com 12 títulos e as justificativas da IA.
+Um endereço que não muda pede um **túnel nomeado**, que precisa de uma conta grátis na Cloudflare **e de um
+domínio próprio** cadastrado nela. A Cloudflare não dá domínio de graça, e um `.com` custa por volta de
+US$ 10 por ano. Com o domínio:
 
-## Plano B: Railway
-
-Se o Azure for Students não sair, o Railway roda os mesmos Dockerfiles. Cada pasta vira um serviço, e os
-nomes internos (`catalog-service`, `llm-service`, `recommendation-service`, `frontend`) precisam bater com
-os do Compose. O próprio Railway faz o HTTPS, então o Caddy sai. O `real-ip.conf` precisa confiar na faixa
-do proxy deles. O Railway é pago depois dos 30 dias de teste (US$ 5 por mês mais o uso).
+1. No painel da Cloudflare, em Zero Trust → Networks → Tunnels, crie um túnel e copie o token.
+2. Em "Public Hostname", aponte o nome escolhido (ex.: `watchmatch.seudominio.com`) para `http://gateway:80`.
+3. No `docker-compose.prod.yml`, troque o `command` do `tunnel` por `tunnel --no-autoupdate run`
+   e acrescente `environment: { TUNNEL_TOKEN: "${TUNNEL_TOKEN}" }`.
+4. Ponha `TUNNEL_TOKEN=...` no arquivo `.env` da raiz, que fica fora do Git.

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Atualiza o WatchMatch na VM com a versão da main (docs/DEPLOY.md).
+# Sobe o WatchMatch de produção com o túnel da Cloudflare e mostra o endereço público (docs/DEPLOY.md).
 # Uso, na pasta do projeto: deploy/deploy.sh
+# Sobe o código que está na pasta agora. Para publicar a versão da main, rode git pull antes.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -9,20 +10,65 @@ if [[ ! -f backend/.env ]]; then
     echo "Falta backend/.env com as chaves do TMDB e do Groq (copie de backend/.env.example)." >&2
     exit 1
 fi
-if ! grep -qs '^DOMAIN=.\+' .env; then
-    echo "Falta DOMAIN no arquivo .env da raiz (ex.: echo DOMAIN=watchmatch.duckdns.org > .env)." >&2
-    exit 1
-fi
 
-echo "==> Baixando a versão nova"
-git pull --ff-only
+compose=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
+
+# Link fixo: publica deploy/link.html na branch gh-pages com o endereço do túnel. O GitHub Pages serve essa
+# página em https://<usuário>.github.io/<repositório>/ e ela redireciona para o endereço do dia.
+# O commit é montado direto no Git (hash-object, mktree, commit-tree): não troca de branch nem mexe na
+# pasta de trabalho ou na main. Para não publicar: PUBLICAR_LINK=0 deploy/deploy.sh
+publish_link() {
+    local url=$1
+    if [[ "${PUBLICAR_LINK:-1}" == "0" ]]; then
+        return 0
+    fi
+    local page blob nojekyll tree parent commit
+    page=$(sed -e "s#__URL__#${url}#g" -e "s#__QUANDO__#$(date '+%d/%m/%Y %H:%M')#g" deploy/link.html)
+    blob=$(printf '%s\n' "$page" | git hash-object -w --stdin)
+    nojekyll=$(git hash-object -w --stdin </dev/null)
+    tree=$(printf '100644 blob %s\tindex.html\n100644 blob %s\t.nojekyll\n' "$blob" "$nojekyll" | git mktree)
+    git fetch -q origin gh-pages 2>/dev/null || true
+    parent=$(git rev-parse -q --verify refs/remotes/origin/gh-pages || true)
+    commit=$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "link fixo: $url")
+    if git push -q origin "$commit:refs/heads/gh-pages"; then
+        echo "==> Link fixo atualizado (o GitHub Pages leva 1 a 2 minutos para mostrar o novo endereço)"
+    else
+        echo "Não consegui atualizar o link fixo (git push na gh-pages falhou). O site está no ar mesmo assim." >&2
+    fi
+}
+
+# Endereço público do GitHub Pages deste repositório (ex.: https://lucasbinda.github.io/notComplete/)
+pages_url() {
+    local remote owner repo
+    remote=$(git remote get-url origin 2>/dev/null || true)
+    if [[ "$remote" =~ github\.com[:/]([^/]+)/([^/.]+) ]]; then
+        owner=$(echo "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]')
+        repo=${BASH_REMATCH[2]}
+        echo "https://${owner}.github.io/${repo}/"
+    fi
+}
 
 echo "==> Construindo e subindo (o build Maven leva alguns minutos)"
-compose=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
 "${compose[@]}" up -d --build --wait
 
 echo "==> Limpando imagens antigas"
 docker image prune -f >/dev/null
 
 "${compose[@]}" ps
-echo "==> Pronto: https://$(grep '^DOMAIN=' .env | cut -d= -f2)"
+
+echo "==> Esperando o endereço do túnel"
+for _ in $(seq 30); do
+    url=$("${compose[@]}" logs tunnel 2>/dev/null | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -n 1 || true)
+    if [[ -n "$url" ]]; then
+        echo "==> Pronto: $url"
+        publish_link "$url"
+        link=$(pages_url)
+        if [[ -n "$link" && "${PUBLICAR_LINK:-1}" != "0" ]]; then
+            echo "==> Link fixo para entregar: $link"
+        fi
+        exit 0
+    fi
+    sleep 2
+done
+echo "O túnel não mostrou o endereço em 1 minuto. Veja: ${compose[*]} logs tunnel" >&2
+exit 1

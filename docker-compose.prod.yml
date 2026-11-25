@@ -1,11 +1,12 @@
 # Produção (docs/DEPLOY.md): soma-se ao docker-compose.yml.
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
-# ou só deploy/deploy.sh. O domínio vem de DOMAIN no arquivo .env da raiz (fora do Git).
+# ou só deploy/deploy.sh, que também mostra o endereço público.
 #
 # O que muda em relação ao de casa:
-#  - o Caddy fica na frente, com HTTPS automático (Let's Encrypt), e é o único com portas abertas (80 e 443);
-#  - o gateway deixa de abrir a 8080 e confia no IP real que o Caddy repassa (deploy/real-ip.conf);
-#  - cada container tem teto de memória, para os três Java caberem numa VM de 4 GB;
+#  - um túnel da Cloudflare (cloudflared) publica o site com HTTPS num endereço *.trycloudflare.com,
+#    sem abrir porta nenhuma no computador nem no roteador: o túnel sai daqui para a Cloudflare;
+#  - o gateway deixa de abrir a 8080 e usa o IP real do visitante que a Cloudflare repassa (deploy/real-ip.conf);
+#  - cada container tem teto de memória, para os três Java não tomarem a máquina;
 #  - os logs giram (até 3 arquivos de 10 MB por container) para não encher o disco.
 
 x-logging: &logging
@@ -24,63 +25,50 @@ services:
       <<: *java
     mem_limit: 640m
     logging: *logging
-    restart: always
+    restart: unless-stopped
 
   llm-service:
     environment:
       <<: *java
     mem_limit: 512m
     logging: *logging
-    restart: always
+    restart: unless-stopped
 
   recommendation-service:
     environment:
       <<: *java
     mem_limit: 512m
     logging: *logging
-    restart: always
+    restart: unless-stopped
 
   frontend:
     mem_limit: 64m
     logging: *logging
-    restart: always
+    restart: unless-stopped
 
   gateway:
-    # Sem porta para fora: só o Caddy fala com o gateway
+    # Sem porta para fora: só o túnel fala com o gateway
     ports: !reset []
     volumes:
       - ./deploy/real-ip.conf:/etc/nginx/conf.d/real-ip.conf:ro
     mem_limit: 64m
     logging: *logging
-    restart: always
+    restart: unless-stopped
 
-  caddy:
-    image: caddy:2.10-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      DOMAIN: "${DOMAIN:?Defina DOMAIN no arquivo .env da raiz, por exemplo DOMAIN=watchmatch.duckdns.org}"
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      # Certificados: sem o volume, cada reinício pediria um novo ao Let's Encrypt (que tem limite)
-      - caddy_data:/data
-      - caddy_config:/config
+  tunnel:
+    image: cloudflare/cloudflared:2026.11.1
+    # Túnel rápido: não precisa de conta. O endereço é sorteado e muda toda vez que o túnel reinicia.
+    command: tunnel --no-autoupdate --url http://gateway:80
     depends_on:
       gateway:
         condition: service_healthy
-    mem_limit: 128m
+    mem_limit: 64m
     logging: *logging
-    restart: always
+    restart: unless-stopped
 
-# Faixa fixa da rede interna: o gateway só aceita X-Forwarded-For vindo daqui (deploy/real-ip.conf)
+# Faixa fixa da rede interna: o gateway só aceita o IP repassado vindo daqui (deploy/real-ip.conf)
 networks:
   default:
     ipam:
       config:
         - subnet: 172.30.0.0/24
-
-volumes:
-  caddy_data:
-  caddy_config:
