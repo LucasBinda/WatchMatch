@@ -139,9 +139,10 @@ export default function App() {
         </div>
 
         {meta ? (
-          <div className="lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[17rem_minmax(0,1fr)]">
-            {/* Coluna de filtros, como nos marketplaces. No celular vira a janela do botão "Filtros" */}
-            <aside aria-label="Filtros" className="hidden lg:block">
+          <div className="md:grid md:grid-cols-[14rem_minmax(0,1fr)] md:gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[17rem_minmax(0,1fr)]">
+            {/* Coluna de filtros, como nos marketplaces. Aparece a partir de 768 px (cobre zoom alto num
+                monitor comum); abaixo disso vira a janela do botão "Filtros" */}
+            <aside aria-label="Filtros" className="hidden md:block">
               <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain pr-3 pb-4 [scrollbar-color:var(--color-line)_transparent] [scrollbar-width:thin]">
                 <FilterPanel meta={meta} form={form} onChange={setForm} />
                 {dirty && searchedKey !== null && (

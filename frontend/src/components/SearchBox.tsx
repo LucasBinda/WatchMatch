@@ -14,7 +14,7 @@ interface Props {
 }
 
 // O pedido em texto livre, no topo dos resultados. Os filtros ficam na coluna da esquerda
-// (no celular, no botão "Filtros")
+// (em tela estreita, na barra "Filtros" logo abaixo)
 export function SearchBox({ form, loading, activeFilters, onChange, onSubmit, onOpenFilters }: Props) {
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -49,19 +49,6 @@ export function SearchBox({ form, loading, activeFilters, onChange, onSubmit, on
           className="max-h-40 min-h-11 flex-1 resize-none bg-transparent py-2.5 text-base leading-relaxed outline-none [field-sizing:content] placeholder:text-faint"
         />
         <button
-          type="button"
-          onClick={onOpenFilters}
-          className="relative flex h-11 items-center gap-2 rounded-xl border border-line px-3 text-sm text-muted transition hover:text-ink lg:hidden"
-        >
-          <SlidersHorizontal className="size-4" />
-          <span className="max-sm:sr-only">Filtros</span>
-          {activeFilters > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-brand text-[11px] font-bold text-page">
-              {activeFilters}
-            </span>
-          )}
-        </button>
-        <button
           type="submit"
           disabled={loading || noProvider}
           title={noProvider ? 'Escolha pelo menos uma plataforma' : undefined}
@@ -71,6 +58,20 @@ export function SearchBox({ form, loading, activeFilters, onChange, onSubmit, on
           <span className="max-sm:sr-only">{loading ? 'Procurando…' : 'Buscar'}</span>
         </button>
       </div>
+      {/* Sem a coluna de filtros (tela estreita ou zoom alto), os filtros abrem por esta barra */}
+      <button
+        type="button"
+        onClick={onOpenFilters}
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:border-brand md:hidden"
+      >
+        <SlidersHorizontal className="size-4 text-brand-soft" />
+        Filtros
+        {activeFilters > 0 && (
+          <span className="grid size-5 place-items-center rounded-full bg-brand text-[11px] font-bold text-page">
+            {activeFilters}
+          </span>
+        )}
+      </button>
       {form.query.length > MAX_QUERY * 0.8 && (
         <p className="mt-1 text-right text-xs text-muted">
           {form.query.length}/{MAX_QUERY}
