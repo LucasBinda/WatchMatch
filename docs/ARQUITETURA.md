@@ -83,6 +83,14 @@ frontend ──POST /api/recommend {texto, filtros}──▶ gateway ──▶ r
 inglês, até 5) viram ids do TMDB (`/search/keyword`, com cache) e entram com **OU**: "E" entre todas quase
 sempre zera a busca nas plataformas do usuário. Palavra sem correspondência é ignorada.
 
+**Gêneros de filme e de série.** O TMDB tem uma lista de gêneros para filme e outra para série, com ids
+diferentes. O site usa uma lista só (ids de filme, e os de série para gêneros que só existem em série), e o
+catalog-service (`GenreMap`) traduz por tipo: Ficção científica 878 e Fantasia 14 viram Sci-Fi & Fantasy 10765 em
+série; Ação 28 e Aventura 12 viram Action & Adventure 10759; Guerra 10752 vira War & Politics 10768. O tipo que não
+tem o gênero pedido (Terror e Romance em séries; Reality e Kids em filmes) não é buscado, porque buscar sem o gênero
+traria qualquer título. Na tela, esses gêneros aparecem esmaecidos no formato que não os tem, e trocar o formato
+nunca apaga a seleção.
+
 **Duração conferida pela ficha.** O filtro de duração do TMDB (`with_runtime`) é frouxo: o eval achou
 terrores "curtos" de 110 min, e num teste 32 de 60 animações "até 90 min" passavam disso. O índice de busca
 do TMDB não bate com a ficha, e a duração muda conforme o idioma da ficha (Nausicaä: 95 min na padrão, 117
@@ -234,7 +242,7 @@ repassa é o proxy do Vite (sem rate limit); no Docker, o gateway.
 
 ### Telas
 
-1. **Home / busca** — campo grande ("O que você quer assistir hoje?"), chips de exemplo, seleção das plataformas assinadas (salva no `localStorage`, sem cadastro) e painel de filtros recolhível (filme/série, gêneros, duração, ano, classificação, idioma). Os gêneros aceitam vários de uma vez, com "todos" (padrão: faroeste **e** ficção científica, vira `with_genres=37,878` no TMDB) ou "qualquer um" (`37|878`). Os gêneros que a IA entende são sempre "qualquer um": "comédia romântica" vira comédia ou romance. Cada gênero também pode ser proibido (botão ⊘ na lista). Abaixo da barra de busca, os filtros aparecem como chips com X: o X só tira do formulário, e o botão "Buscar de novo" aparece quando algo mudou desde a última busca. Proibido na tela vence o que a IA entender no texto.
+1. **Home / busca** — campo grande ("O que vamos assistir hoje?"), chips de exemplo e os filtros numa coluna à esquerda, como nos marketplaces (formato, gêneros, duração, plataformas assinadas — salvas no `localStorage`, sem cadastro — e o modo da IA). No celular a coluna vira a janela do botão "Filtros". Os cards mostram o pôster em destaque, com título, ano, duração e nota sobre ele. Os gêneros aceitam vários de uma vez, com "todos" (padrão: faroeste **e** ficção científica, vira `with_genres=37,878` no TMDB) ou "qualquer um" (`37|878`). Os gêneros que a IA entende são sempre "qualquer um": "comédia romântica" vira comédia ou romance. Cada gênero também pode ser proibido (botão ⊘ na lista). Abaixo da barra de busca, os filtros aparecem como chips com X: o X só tira do formulário, e o botão "Buscar de novo" aparece quando algo mudou desde a última busca. Proibido na tela vence o que a IA entender no texto.
 2. **Resultados** — critérios interpretados em chips editáveis ("Entendi: comédia · até 2h · Netflix") e grade de cards com o motivo da IA, logos das plataformas e "Gostei"/"Não gostei"/"Vou assistir".
 3. **Detalhe** (gaveta/modal) — sinopse, elenco, classificação, onde assistir, "mais parecidos".
 4. **Sobre / Privacidade** — limitações, fontes e **atribuição obrigatória ao TMDB e ao JustWatch**.

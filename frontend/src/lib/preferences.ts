@@ -8,7 +8,7 @@ const PAGE_SIZE_KEY = 'watchmatch.pageSize'
 const AI_MODE_KEY = 'watchmatch.aiMode'
 
 const DEFAULT_PROVIDERS = [8, 119] // Netflix e Prime Video
-const DEFAULT_PAGE_SIZE: PageSize = 12
+const DEFAULT_PAGE_SIZE: PageSize = 24
 const DEFAULT_AI_MODE: AiMode = 'pick'
 
 function load<T>(key: string, valid: (value: unknown) => value is T, fallback: T): T {

@@ -2,6 +2,7 @@
 
 import catalog from '../mocks/catalog.json'
 import { shortProviderName } from '../lib/format'
+import { canonicalGenres } from '../lib/genres'
 import type { Meta, Recommendation, RecommendRequest, RecommendResponse } from '../types'
 
 const LATENCY_MS = 700
@@ -40,7 +41,8 @@ export function recommend(request: RecommendRequest): Promise<RecommendResponse>
     .filter((t) => !filters.runtimeMax || t.mediaType === 'tv' || (t.runtime ?? 0) <= filters.runtimeMax)
     .filter((t) => {
       if (!filters.genres?.length) return true
-      const ids = (t.genres ?? []).map((g) => g.id)
+      // Mesma tradução do catálogo: série com Sci-Fi & Fantasy conta como Ficção científica e Fantasia
+      const ids = canonicalGenres((t.genres ?? []).map((g) => g.id))
       return filters.genreMatch === 'all'
         ? filters.genres.every((g) => ids.includes(g))
         : filters.genres.some((g) => ids.includes(g))

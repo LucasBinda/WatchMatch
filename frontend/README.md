@@ -42,11 +42,19 @@ src/
   lib/format.ts           formatação (duração, classificação, chips "Entendi")
   lib/searchForm.ts       estado do formulário de busca e opções dos filtros
   lib/useModalDialog.ts   abre/fecha um <dialog> nativo a partir do estado
+  lib/palettes.ts         paletas de cor e gerador (seletor de paletas)
   components/
-    Header · SearchBar · SearchModal · SearchFields · SelectField · PlatformPicker
-    ResultsPanel · CriteriaChips · TitleCard · TitleDetails
-    Footer
+    Header · SearchBox · FilterChips · FilterPanel · GenreList · PlatformPicker
+    FiltersDialog (filtros no celular) · ResultsPanel · CriteriaChips · TitleCard · TitleDetails
+    PaletteSwitcher · Footer
 ```
+
+## Trocar a paleta de cores
+
+Todas as cores passam pelos tokens `--color-*` do `src/index.css`. Em desenvolvimento (ou com `?paletas` na URL)
+aparece um botão redondo no canto inferior direito: ele troca a paleta na hora, entre 13 prontas ou uma gerada
+ao acaso, e lembra a escolha neste navegador. Gostou de uma? "Copiar cores" copia os tokens para colar no
+`@theme` do `index.css`, que é o que o público vê.
 
 ## Pendências
 

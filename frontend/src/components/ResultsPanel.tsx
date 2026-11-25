@@ -43,7 +43,7 @@ export function ResultsPanel({
     <section aria-live="polite">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex items-baseline gap-3">
-          <h2 className="text-xl font-semibold sm:text-2xl">Sugestões</h2>
+          <h2 className="font-display text-xl font-bold sm:text-2xl">Sugestões</h2>
           <p className="text-sm text-muted">
             {loading
               ? 'Procurando títulos…'
@@ -83,7 +83,7 @@ export function ResultsPanel({
       {error && !loading && <Notice icon={CircleAlert}>{error}</Notice>}
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-x-5 md:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 4 }, (_, i) => (
             <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-line">
               <div className="aspect-[2/3] bg-surface-2" />
@@ -97,7 +97,7 @@ export function ResultsPanel({
         </div>
       ) : count > 0 ? (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-x-5 md:grid-cols-3 xl:grid-cols-4">
             {result!.items.map((item) => (
               <TitleCard key={`${item.mediaType}-${item.id}`} title={item} onOpen={() => onOpen(item)} />
             ))}

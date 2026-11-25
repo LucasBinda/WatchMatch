@@ -5,11 +5,15 @@ import { FilterChips } from './components/FilterChips'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
 import { MockBanner } from './components/MockBanner'
+import { PaletteSwitcher } from './components/PaletteSwitcher'
 import { ResultsPanel } from './components/ResultsPanel'
-import { SearchModal } from './components/SearchModal'
+import { FilterPanel } from './components/FilterPanel'
+import { FiltersDialog } from './components/FiltersDialog'
+import { SearchBox } from './components/SearchBox'
 import { TitleDetails } from './components/TitleDetails'
+import { paletteToolEnabled } from './lib/palettes'
 import { loadAiMode, loadPageSize, loadProviders, saveAiMode, savePageSize, saveProviders } from './lib/preferences'
-import { applyAiCriteria, searchKey, userFilters, type SearchForm } from './lib/searchForm'
+import { applyAiCriteria, filterChips, searchKey, userFilters, type SearchForm } from './lib/searchForm'
 import type { Meta, PageSize, Recommendation, RecommendRequest, RecommendResponse } from './types'
 
 export default function App() {
@@ -105,6 +109,8 @@ export default function App() {
     if (lastRequest) run({ ...lastRequest, limit: size, page: undefined })
   }
 
+  const dirty = searchKey(form) !== searchedKey
+
   function submitSearch() {
     setSearchOpen(false)
     search(form)
@@ -121,25 +127,49 @@ export default function App() {
       <MockBanner />
       <Header />
 
-      <main id="descobrir" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="space-y-8">
-          <div>
-            <h1 className="max-w-3xl text-3xl leading-tight font-bold tracking-tight sm:text-4xl lg:text-5xl">
-              Filmes e séries para hoje, nas plataformas que você já assina
-            </h1>
-            <p className="mt-3 max-w-2xl text-lg text-muted">
-              Escreva do seu jeito, como “comédia curta para ver em casal”, e veja onde assistir.
-            </p>
-          </div>
+      <main id="descobrir" className="mx-auto max-w-7xl px-4 pt-8 pb-14 sm:px-6 sm:pt-12">
+        <div className="mb-8 max-w-3xl">
+          <h1 className="font-display text-3xl leading-[1.1] font-bold tracking-tight sm:text-4xl lg:text-5xl">
+            O que vamos assistir <span className="text-brand">hoje?</span>
+          </h1>
+          <p className="mt-3 text-lg text-muted">
+            Escreva do seu jeito e veja o que combina, nas plataformas que você já assina.
+          </p>
+        </div>
 
-          {meta ? (
-            <div className="space-y-6">
-              <SearchModal
+        {meta ? (
+          <div className="lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[17rem_minmax(0,1fr)]">
+            {/* Coluna de filtros, como nos marketplaces. No celular vira a janela do botão "Filtros" */}
+            <aside aria-label="Filtros" className="hidden lg:block">
+              <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain pr-3 pb-4 [scrollbar-color:var(--color-line)_transparent] [scrollbar-width:thin]">
+                <FilterPanel meta={meta} form={form} onChange={setForm} />
+                {dirty && searchedKey !== null && (
+                  <button
+                    type="button"
+                    onClick={submitSearch}
+                    disabled={loading || form.providers.length === 0}
+                    className="mt-5 w-full rounded-xl bg-brand py-2.5 font-semibold text-page transition hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Buscar com estes filtros
+                  </button>
+                )}
+              </div>
+            </aside>
+
+            <div className="min-w-0 space-y-5">
+              <SearchBox
+                form={form}
+                loading={loading}
+                activeFilters={filterChips(form, meta).length}
+                onChange={setForm}
+                onSubmit={submitSearch}
+                onOpenFilters={() => setSearchOpen(true)}
+              />
+              <FiltersDialog
                 open={searchOpen}
                 meta={meta}
                 form={form}
                 loading={loading}
-                onOpen={() => setSearchOpen(true)}
                 onClose={() => setSearchOpen(false)}
                 onChange={setForm}
                 onSubmit={submitSearch}
@@ -147,7 +177,7 @@ export default function App() {
               <FilterChips
                 meta={meta}
                 form={form}
-                dirty={searchKey(form) !== searchedKey}
+                dirty={dirty}
                 searched={searchedKey !== null}
                 loading={loading}
                 onChange={setForm}
@@ -166,18 +196,19 @@ export default function App() {
                 onOpen={setSelected}
               />
             </div>
-          ) : error ? (
-            <p className="text-star">{error}</p>
-          ) : (
-            <p className="flex items-center gap-2 text-muted">
-              <LoaderCircle className="size-5 animate-spin" /> Carregando…
-            </p>
-          )}
-        </div>
+          </div>
+        ) : error ? (
+          <p className="text-star">{error}</p>
+        ) : (
+          <p className="flex items-center gap-2 text-muted">
+            <LoaderCircle className="size-5 animate-spin" /> Carregando…
+          </p>
+        )}
       </main>
 
       <Footer />
       <TitleDetails title={selected} onClose={() => setSelected(null)} />
+      {paletteToolEnabled() && <PaletteSwitcher />}
     </div>
   )
 }

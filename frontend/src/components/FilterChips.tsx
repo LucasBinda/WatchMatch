@@ -32,7 +32,7 @@ export function FilterChips({ meta, form, dirty, searched, loading, onChange, on
         return (
           <Fragment key={chipKey(chip)}>
             {showJoiner && <span className="text-xs text-faint">{joiner}</span>}
-            <Chip chip={chip} onRemove={() => onChange(removeFilter(form, chip, meta))} />
+            <Chip chip={chip} onRemove={() => onChange(removeFilter(form, chip))} />
           </Fragment>
         )
       })}

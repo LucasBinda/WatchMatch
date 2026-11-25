@@ -1,3 +1,4 @@
+import { allGenres, canonicalGenres } from './genres'
 import { formatRuntime } from './format'
 import type { AiMode, AppliedCriteria, Criteria, GenreMatch, MediaType, Meta, PageSize } from '../types'
 
@@ -47,17 +48,13 @@ export function runtimeLabel(value: string): string {
   return RUNTIME_OPTIONS.find((o) => o.value === value)?.label ?? `Até ${formatRuntime(Number(value))}`
 }
 
-// Gêneros de série têm ids próprios no TMDB; sem formato escolhido, usamos os de filme
-export function genresFor(mediaType: string, meta: Meta) {
-  return mediaType === 'tv' ? meta.genres.tv : meta.genres.movie
-}
 
 // "Faroeste + Ficção científica" (todos) ou "Faroeste ou Ficção científica" (qualquer um); '' = qualquer gênero
 export function genreLabel(form: SearchForm, meta: Meta): string {
-  const names = genresFor(form.mediaType, meta)
+  const names = allGenres(meta)
     .filter((g) => form.genres.includes(g.id))
     .map((g) => g.name)
-  const banned = genresFor(form.mediaType, meta)
+  const banned = allGenres(meta)
     .filter((g) => form.excludeGenres.includes(g.id))
     .map((g) => `sem ${g.name.toLowerCase()}`)
   const wanted = wantedLabel(names, form.genreMatch)
@@ -79,7 +76,7 @@ export type FilterChip =
 // Os filtros do formulário como chips da página principal (cada um com X)
 export function filterChips(form: SearchForm, meta: Meta): FilterChip[] {
   const ai = (field: FilterField) => form.aiFields.includes(field)
-  const genres = genresFor(form.mediaType, meta)
+  const genres = allGenres(meta)
   const chips: FilterChip[] = []
   if (form.mediaType) {
     chips.push({ kind: 'mediaType', label: form.mediaType === 'movie' ? 'Filmes' : 'Séries', ai: ai('mediaType') })
@@ -95,7 +92,7 @@ export function filterChips(form: SearchForm, meta: Meta): FilterChip[] {
 }
 
 // O X de um chip: tira só aquele filtro do formulário. A busca roda quando o usuário pedir
-export function removeFilter(form: SearchForm, chip: FilterChip, meta: Meta): SearchForm {
+export function removeFilter(form: SearchForm, chip: FilterChip): SearchForm {
   switch (chip.kind) {
     case 'genre':
       return setGenreFilter(form, { genres: form.genres.filter((g) => g !== chip.id) })
@@ -103,14 +100,8 @@ export function removeFilter(form: SearchForm, chip: FilterChip, meta: Meta): Se
       return setGenreFilter(form, { excludeGenres: form.excludeGenres.filter((g) => g !== chip.id) })
     case 'runtimeMax':
       return setField(form, 'runtimeMax', '')
-    case 'mediaType': {
-      // Sem formato vale a lista de gêneros de filme: ficam só os gêneros que existem nela
-      const ids = new Set(genresFor('', meta).map((g) => g.id))
-      const next = { ...form, mediaType: '', aiFields: form.aiFields.filter((f) => f !== 'mediaType') }
-      next.genres = form.genres.filter((g) => ids.has(g))
-      next.excludeGenres = form.excludeGenres.filter((g) => ids.has(g))
-      return next
-    }
+    case 'mediaType':
+      return setField(form, 'mediaType', '')
   }
 }
 
@@ -134,11 +125,7 @@ export function searchKey(form: SearchForm): string {
 export function setField(form: SearchForm, field: 'runtimeMax' | 'mediaType', value: string): SearchForm {
   const next = { ...form, [field]: value, aiFields: form.aiFields.filter((f) => f !== field) }
   // Trocar o formato troca a lista de gêneros
-  if (field === 'mediaType') {
-    next.genres = []
-    next.excludeGenres = []
-    next.aiFields = next.aiFields.filter((f) => f !== 'genres' && f !== 'excludeGenres')
-  }
+  // Trocar o formato não mexe nos gêneros: a lista é uma só (lib/genres.ts) e o catálogo traduz
   return next
 }
 
@@ -186,18 +173,14 @@ export function applyAiCriteria(form: SearchForm, criteria: AppliedCriteria, met
   }
 
   if (fromAi('mediaType') && criteria.mediaType) {
-    // Gênero escolhido pelo usuário que não existe no novo formato: não troca o formato
-    const ids = new Set(genresFor(criteria.mediaType, meta).map((g) => g.id))
-    const keepsGenre = [...next.genres, ...next.excludeGenres].every((g) => ids.has(g))
-    if (keepsGenre) {
-      next.mediaType = criteria.mediaType
-      next.aiFields.push('mediaType')
-    }
+    next.mediaType = criteria.mediaType
+    next.aiFields.push('mediaType')
   }
+  // A IA pode mandar ids de série (Sci-Fi & Fantasy): viram os da lista única
+  const known = new Set(allGenres(meta).map((g) => g.id))
   if (fromAi('genres') && criteria.genres) {
-    // Ficam os que existem na lista do formato. Os gêneros da IA são sempre "qualquer um"
-    const ids = new Set(genresFor(next.mediaType, meta).map((g) => g.id))
-    const genres = criteria.genres.filter((g) => ids.has(g))
+    // Os gêneros da IA são sempre "qualquer um"
+    const genres = canonicalGenres(criteria.genres).filter((g) => known.has(g))
     if (genres.length > 0) {
       next.genres = genres
       next.genreMatch = 'any'
@@ -205,8 +188,7 @@ export function applyAiCriteria(form: SearchForm, criteria: AppliedCriteria, met
     }
   }
   if (fromAi('excludeGenres') && criteria.excludeGenres) {
-    const ids = new Set(genresFor(next.mediaType, meta).map((g) => g.id))
-    const excluded = criteria.excludeGenres.filter((g) => ids.has(g) && !next.genres.includes(g))
+    const excluded = canonicalGenres(criteria.excludeGenres).filter((g) => known.has(g) && !next.genres.includes(g))
     if (excluded.length > 0) {
       next.excludeGenres = excluded
       next.aiFields.push('excludeGenres')

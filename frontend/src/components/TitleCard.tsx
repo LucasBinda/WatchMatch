@@ -1,4 +1,4 @@
-import { ArrowRight, Clock, Clapperboard, Star, Tv } from 'lucide-react'
+import { Clapperboard, Star } from 'lucide-react'
 import { formatCertification, formatRuntime } from '../lib/format'
 import type { Recommendation } from '../types'
 
@@ -7,18 +7,34 @@ interface Props {
   onOpen: () => void
 }
 
+// Pôster em destaque: título, ano, duração e nota ficam sobre um degradê na parte de baixo do pôster.
+// A justificativa da IA vem embaixo, em texto menor. O pôster inteiro abre os detalhes
 export function TitleCard({ title, onOpen }: Props) {
   const genres = (title.genres ?? []).slice(0, 2)
+  const length =
+    title.mediaType === 'movie' && title.runtime
+      ? formatRuntime(title.runtime)
+      : title.mediaType === 'tv'
+        ? title.seasons
+          ? `${title.seasons} temporada${title.seasons > 1 ? 's' : ''}`
+          : 'Série'
+        : null
+  const facts = [title.year, length].filter(Boolean).join(' · ')
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-surface-2/60 transition hover:-translate-y-0.5 hover:border-brand/60">
-      <button type="button" onClick={onOpen} className="relative block aspect-[2/3] overflow-hidden bg-surface-2" aria-label={`Ver detalhes de ${title.title}`}>
+    <article className="group flex flex-col">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Ver detalhes de ${title.title}`}
+        className="relative block aspect-[2/3] overflow-hidden rounded-xl bg-surface-2 text-left ring-1 ring-line transition duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl group-hover:shadow-black/50 group-hover:ring-brand/70 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+      >
         {title.posterUrl ? (
           <img
             src={title.posterUrl}
             alt=""
             loading="lazy"
-            className="size-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="size-full object-cover transition duration-500 group-hover:scale-[1.04]"
           />
         ) : (
           <div className="grid size-full place-items-center text-faint">
@@ -27,60 +43,36 @@ export function TitleCard({ title, onOpen }: Props) {
         )}
 
         {title.certification && (
-          <span className="absolute top-3 left-3 rounded-md bg-black/70 px-2 py-0.5 text-xs font-semibold backdrop-blur">
+          <span className="absolute top-2.5 left-2.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] font-bold text-white backdrop-blur">
             {formatCertification(title.certification)}
           </span>
         )}
 
-        <div className="absolute right-3 bottom-3 flex gap-1.5">
+        <div className="absolute top-2.5 right-2.5 flex gap-1">
           {title.watch.providers.map((p) =>
             p.logoUrl ? (
-              <img key={p.id} src={p.logoUrl} alt={p.name} title={p.name} className="size-8 rounded-lg shadow-lg ring-1 ring-black/40" />
+              <img key={p.id} src={p.logoUrl} alt={p.name} title={p.name} className="size-7 rounded-md shadow-lg ring-1 ring-black/40" />
             ) : null,
           )}
         </div>
+
+        {/* Sobre o pôster o texto é sempre claro, em qualquer paleta: o degradê garante o contraste */}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-3 pt-14 pb-3 text-white">
+          <h3 className="font-display text-base leading-snug font-bold sm:text-lg">{title.title}</h3>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-white/75">
+            {facts && <span>{facts}</span>}
+            {title.voteAverage ? (
+              <span className="flex items-center gap-1 text-white">
+                <Star className="size-3.5 fill-star text-star" />
+                {title.voteAverage.toFixed(1)}
+              </span>
+            ) : null}
+          </p>
+          {genres.length > 0 && <p className="mt-0.5 truncate text-xs text-white/60">{genres.map((g) => g.name).join(' · ')}</p>}
+        </div>
       </button>
 
-      <div className="flex flex-1 flex-col p-4">
-        <h3 className="text-lg leading-snug font-semibold">
-          {title.title}
-          {title.year && <span className="ml-1.5 text-sm font-normal text-muted">({title.year})</span>}
-        </h3>
-
-        {genres.length > 0 && (
-          <p className="mt-1 text-sm text-muted">{genres.map((g) => g.name).join(' · ')}</p>
-        )}
-
-        <div className="mt-3 flex items-center gap-4 text-sm">
-          {title.mediaType === 'movie' && title.runtime ? (
-            <span className="flex items-center gap-1.5">
-              <Clock className="size-4 text-muted" />
-              {formatRuntime(title.runtime)}
-            </span>
-          ) : title.mediaType === 'tv' ? (
-            <span className="flex items-center gap-1.5">
-              <Tv className="size-4 text-muted" />
-              {title.seasons ? `${title.seasons} temporada${title.seasons > 1 ? 's' : ''}` : 'Série'}
-            </span>
-          ) : null}
-          {title.voteAverage ? (
-            <span className="flex items-center gap-1.5">
-              <Star className="size-4 fill-star text-star" />
-              {title.voteAverage.toFixed(1)}
-            </span>
-          ) : null}
-        </div>
-
-        {title.reason && <p className="mt-3 text-[15px] leading-relaxed text-ink/85">{title.reason}</p>}
-
-        <button
-          type="button"
-          onClick={onOpen}
-          className="mt-auto flex items-center gap-1.5 pt-4 text-sm font-semibold text-brand-soft transition hover:gap-2.5 hover:text-ink"
-        >
-          Ver detalhes <ArrowRight className="size-4" />
-        </button>
-      </div>
+      {title.reason && <p className="mt-2.5 line-clamp-4 px-0.5 text-sm leading-relaxed text-muted">{title.reason}</p>}
     </article>
   )
 }
