@@ -55,6 +55,11 @@ export function TitleDetails({ title, onClose }: Props) {
                     <Tv className="size-4 text-muted" /> {title.seasons ? `${title.seasons} temporadas` : 'Série'}
                   </span>
                 )}
+                {title.mediaType === 'tv' && title.runtime && (
+                  <span className="flex items-center gap-1.5" title="Duração de cada episódio">
+                    <Clock className="size-4 text-muted" /> {formatRuntime(title.runtime)} por episódio
+                  </span>
+                )}
                 {title.voteAverage ? (
                   <span className="flex items-center gap-1.5">
                     <Star className="size-4 fill-star text-star" /> {title.voteAverage.toFixed(1)}

@@ -116,7 +116,7 @@ class TmdbClientTest {
     @Test
     void detailsDeSeriePedeAClassificacaoDaTv() {
         tmdbFalso.expect(requestTo("https://api.themoviedb.org/3/tv/1396"
-                        + "?language=pt-BR&append_to_response=watch/providers,credits,content_ratings"))
+                        + "?language=pt-BR&append_to_response=watch/providers,credits,content_ratings,season/1"))
                 .andRespond(withSuccess("{\"id\": 1396, \"name\": \"Breaking Bad\"}", MediaType.APPLICATION_JSON));
 
         assertThat(client.details(TitleType.TV, 1396).name()).isEqualTo("Breaking Bad");

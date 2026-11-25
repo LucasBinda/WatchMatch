@@ -89,7 +89,7 @@ class TitleDetailMapperTest {
         var tmdb = new TmdbDetail(1396, null, "Breaking Bad", null, "Breaking Bad", "Um professor...",
                 "/bb.jpg", null, null, "2008-01-20", 8.9, List.of(new Genre(18, "Drama")),
                 null, List.of(47, 45), 5, "en", null, null,
-                new ContentRatings(List.of(new ContentRating("BR", "16"))), null);
+                new ContentRatings(List.of(new ContentRating("BR", "16"))), null, null, null);
 
         TitleDetail detalhe = mapper.toDetail(tmdb, TitleType.TV);
 
@@ -104,10 +104,47 @@ class TitleDetailMapperTest {
         return new WatchProviders(Map.of("BR", br));
     }
 
+    @Test
+    void serieSemEpisodeRunTimeUsaAMedianaDaPrimeiraTemporada() {
+        // Succession: o TMDB não preenche episode_run_time; o final da série tem 89 min
+        var temporada = new TmdbDetail.Season(List.of(episodio(62), episodio(58), episodio(57), episodio(66),
+                episodio(55)));
+        var tmdb = serie(List.of(), episodio(89), temporada);
+
+        assertThat(mapper.toDetail(tmdb, TitleType.TV).runtime()).isEqualTo(58);
+    }
+
+    @Test
+    void serieSemTemporadaUsaOUltimoEpisodio() {
+        assertThat(mapper.toDetail(serie(List.of(), episodio(30), null), TitleType.TV).runtime()).isEqualTo(30);
+    }
+
+    @Test
+    void episodeRunTimePreenchidoVemPrimeiro() {
+        var temporada = new TmdbDetail.Season(List.of(episodio(40)));
+        assertThat(mapper.toDetail(serie(List.of(22), episodio(30), temporada), TitleType.TV).runtime()).isEqualTo(22);
+    }
+
+    @Test
+    void serieSemNenhumaDuracaoFicaSemDuracao() {
+        // O TMDB usa 0 quando não sabe
+        var temporada = new TmdbDetail.Season(List.of(episodio(0)));
+        assertThat(mapper.toDetail(serie(List.of(0), episodio(null), temporada), TitleType.TV).runtime()).isNull();
+    }
+
+    private static TmdbDetail.Episode episodio(Integer duracao) {
+        return new TmdbDetail.Episode(duracao);
+    }
+
+    private static TmdbDetail serie(List<Integer> episodeRunTime, TmdbDetail.Episode ultimo, TmdbDetail.Season primeira) {
+        return new TmdbDetail(1, null, "Série", null, "Série", "", null, null, null, "2018-06-03", 8.0, List.of(),
+                null, episodeRunTime, 4, "en", null, null, null, null, ultimo, primeira);
+    }
+
     private static TmdbDetail filme(WatchProviders watch, ReleaseDates releases) {
         return new TmdbDetail(1, "Interestelar", null, "Interstellar", null, "Uma equipe...",
                 "/abc.jpg", "/fundo.jpg", "2014-11-05", null, 8.4, List.of(new Genre(878, "Ficção científica")),
                 169, null, null, "en", watch, releases, null,
-                new Credits(List.of(new Cast("Matthew McConaughey"), new Cast("Anne Hathaway"))));
+                new Credits(List.of(new Cast("Matthew McConaughey"), new Cast("Anne Hathaway"))), null, null);
     }
 }

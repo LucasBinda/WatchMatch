@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import br.com.watchmatch.catalog.domain.Genre;
@@ -72,7 +73,7 @@ public class TitleMapper {
                 tmdb.genres() == null ? List.of() : tmdb.genres(),
                 tmdb.voteAverage(),
                 tmdb.originalLanguage(),
-                movie ? runtimeOf(tmdb.runtime()) : episodeRuntimeOf(tmdb.episodeRunTime()),
+                movie ? runtimeOf(tmdb.runtime()) : episodeRuntimeOf(tmdb),
                 movie ? null : tmdb.numberOfSeasons(),
                 movie ? movieCertification(tmdb) : tvCertification(tmdb),
                 imageUrl(BACKDROP_BASE_URL, tmdb.backdropPath()),
@@ -108,8 +109,27 @@ public class TitleMapper {
         return runtime == null || runtime == 0 ? null : runtime;
     }
 
-    private Integer episodeRuntimeOf(List<Integer> episodeRunTime) {
-        return episodeRunTime == null || episodeRunTime.isEmpty() ? null : runtimeOf(episodeRunTime.get(0));
+    // Duração de um episódio. O TMDB quase não preenche mais episode_run_time (20 de 24 séries populares
+    // vinham sem duração, e o filtro "até 30 min" deixava passar Succession). Na falta dele, a mediana dos
+    // episódios da 1ª temporada; o último episódio vem por último porque costuma ser o final, mais longo
+    // (Succession: mediana 58 min, último episódio 89)
+    Integer episodeRuntimeOf(TmdbDetail tmdb) {
+        List<Integer> declared = tmdb.episodeRunTime();
+        if (declared != null && !declared.isEmpty() && runtimeOf(declared.get(0)) != null) {
+            return declared.get(0);
+        }
+        List<Integer> firstSeason = tmdb.firstSeason() == null || tmdb.firstSeason().episodes() == null
+                ? List.of()
+                : tmdb.firstSeason().episodes().stream()
+                        .map(TmdbDetail.Episode::runtime)
+                        .map(this::runtimeOf)
+                        .filter(Objects::nonNull)
+                        .sorted()
+                        .toList();
+        if (!firstSeason.isEmpty()) {
+            return firstSeason.get(firstSeason.size() / 2);
+        }
+        return tmdb.lastEpisode() == null ? null : runtimeOf(tmdb.lastEpisode().runtime());
     }
 
     // Um filme tem vários lançamentos no Brasil (cinema, digital...); vale a primeira classificação preenchida

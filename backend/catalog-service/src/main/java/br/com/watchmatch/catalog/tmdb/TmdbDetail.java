@@ -31,7 +31,18 @@ public record TmdbDetail(
         @JsonProperty("watch/providers") WatchProviders watchProviders,
         @JsonProperty("release_dates") ReleaseDates releaseDates,
         @JsonProperty("content_ratings") ContentRatings contentRatings,
-        Credits credits) {
+        Credits credits,
+        // Só série: o TMDB quase não preenche mais episode_run_time; a duração sai dos episódios
+        @JsonProperty("last_episode_to_air") Episode lastEpisode,
+        @JsonProperty("season/1") Season firstSeason) {
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Episode(Integer runtime) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Season(List<Episode> episodes) {
+    }
 
     // "watch/providers": { "results": { "BR": {...}, "US": {...} } }
     @JsonIgnoreProperties(ignoreUnknown = true)

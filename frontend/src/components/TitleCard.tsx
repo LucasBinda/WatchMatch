@@ -11,14 +11,18 @@ interface Props {
 // A justificativa da IA vem embaixo, em texto menor. O pôster inteiro abre os detalhes
 export function TitleCard({ title, onOpen }: Props) {
   const genres = (title.genres ?? []).slice(0, 2)
+  // Série: temporadas e a duração de cada episódio ("45min/ep"), que é o que o filtro de duração usa
   const length =
-    title.mediaType === 'movie' && title.runtime
-      ? formatRuntime(title.runtime)
-      : title.mediaType === 'tv'
-        ? title.seasons
-          ? `${title.seasons} temporada${title.seasons > 1 ? 's' : ''}`
-          : 'Série'
+    title.mediaType === 'movie'
+      ? title.runtime
+        ? formatRuntime(title.runtime)
         : null
+      : [
+          title.seasons ? `${title.seasons} temporada${title.seasons > 1 ? 's' : ''}` : 'Série',
+          title.runtime ? `${formatRuntime(title.runtime)}/ep` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
   const facts = [title.year, length].filter(Boolean).join(' · ')
 
   return (

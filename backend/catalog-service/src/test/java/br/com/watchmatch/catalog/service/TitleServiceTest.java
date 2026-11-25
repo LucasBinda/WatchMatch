@@ -91,6 +91,6 @@ class TitleServiceTest {
 
     private static TmdbDetail detalhe(int id, String nome) {
         return new TmdbDetail(id, nome, nome, nome, nome, "", null, null, "2020-01-01", "2020-01-01",
-                7.0, List.of(), 100, List.of(), 1, "en", null, null, null, null);
+                7.0, List.of(), 100, List.of(), 1, "en", null, null, null, null, null, null);
     }
 }

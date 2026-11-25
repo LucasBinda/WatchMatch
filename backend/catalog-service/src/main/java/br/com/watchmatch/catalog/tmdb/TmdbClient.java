@@ -44,12 +44,15 @@ public class TmdbClient {
         return list.genres().stream().collect(Collectors.toMap(Genre::id, Genre::name));
     }
 
-    // Uma chamada só traz detalhes + onde assistir + elenco + classificação
+    // Uma chamada só traz detalhes + onde assistir + elenco + classificação.
+    // Série também traz a 1ª temporada: a duração dos episódios sai dela (episode_run_time vem vazio)
     public TmdbDetail details(TitleType type, int id) {
-        String certifications = type == TitleType.MOVIE ? "release_dates" : "content_ratings";
+        // Texto fixo na URL: por variável, a vírgula e a barra de "season/1" sairiam codificadas
+        String uri = type == TitleType.MOVIE
+                ? "/movie/{id}?language=pt-BR&append_to_response=watch/providers,credits,release_dates"
+                : "/tv/{id}?language=pt-BR&append_to_response=watch/providers,credits,content_ratings,season/1";
         return restClient.get()
-                .uri("/{type}/{id}?language=pt-BR&append_to_response=watch/providers,credits,{certifications}",
-                        type.name().toLowerCase(), id, certifications)
+                .uri(uri, id)
                 .retrieve()
                 .body(TmdbDetail.class);
     }
