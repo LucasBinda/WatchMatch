@@ -1,7 +1,7 @@
 export function Footer() {
   return (
     <footer className="border-t border-line/70">
-      <div className="mx-auto max-w-7xl space-y-2 px-4 py-8 text-sm text-muted sm:px-6">
+      <div className="space-y-2 px-4 py-8 text-sm text-muted sm:px-6 lg:px-8">
         <p>Sugestões baseadas em metadados públicos; a disponibilidade pode estar desatualizada.</p>
         {/* TODO: adicionar o logo oficial do TMDB (menos destacado que o nosso), conforme os termos da API */}
         <p>

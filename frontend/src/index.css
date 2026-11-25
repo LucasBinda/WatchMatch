@@ -2,6 +2,8 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* Telas bem largas: a grade de capas passa a 6 colunas (ResultsPanel) */
+  --breakpoint-3xl: 106.25rem;
   /* Títulos grandes */
   --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
 

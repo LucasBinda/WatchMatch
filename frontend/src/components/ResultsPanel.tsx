@@ -83,7 +83,7 @@ export function ResultsPanel({
       {error && !loading && <Notice icon={CircleAlert}>{error}</Notice>}
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-x-5 md:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-x-5 md:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-6">
           {Array.from({ length: 4 }, (_, i) => (
             <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-line">
               <div className="aspect-[2/3] bg-surface-2" />
@@ -97,7 +97,7 @@ export function ResultsPanel({
         </div>
       ) : count > 0 ? (
         <>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-x-5 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-x-5 md:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-6">
             {result!.items.map((item) => (
               <TitleCard key={`${item.mediaType}-${item.id}`} title={item} onOpen={() => onOpen(item)} />
             ))}
@@ -146,7 +146,7 @@ export function ResultsPanel({
   )
 }
 
-// "Mostrar 12 · 24 · 36 · 48": só múltiplos de 12, que fecham as linhas de 2, 3 ou 4 colunas
+// "Mostrar 12 · 24 · 36 · 48": só múltiplos de 12, que fecham as linhas de 2, 3, 4 ou 6 colunas
 function PageSizePicker({
   value,
   disabled,

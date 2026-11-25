@@ -42,7 +42,7 @@ export interface Meta {
   providers: Provider[]
 }
 
-// Múltiplos de 12: a grade tem 2, 3 ou 4 colunas e a última linha sempre fecha
+// Múltiplos de 12: a grade tem 2, 3, 4 ou 6 colunas e a última linha sempre fecha
 export type PageSize = 12 | 24 | 36 | 48
 
 // pick: a IA escolhe e justifica os títulos · filters: a IA só monta os filtros, ordem do catálogo
