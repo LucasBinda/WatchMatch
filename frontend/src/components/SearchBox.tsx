@@ -1,6 +1,6 @@
 import { ArrowRight, LoaderCircle, Search, SlidersHorizontal } from 'lucide-react'
 import type { FormEvent, KeyboardEvent } from 'react'
-import type { SearchForm } from '../lib/searchForm'
+import { AI_MODE_OPTIONS, type SearchForm } from '../lib/searchForm'
 
 const MAX_QUERY = 500
 
@@ -57,6 +57,35 @@ export function SearchBox({ form, loading, activeFilters, onChange, onSubmit, on
           {loading ? <LoaderCircle className="size-5 animate-spin" /> : <ArrowRight className="size-5 sm:hidden" />}
           <span className="max-sm:sr-only">{loading ? 'Procurando…' : 'Buscar'}</span>
         </button>
+      </div>
+      {/* Como a IA ajuda: é sobre o texto digitado, não um filtro do catálogo, por isso fica aqui e não na
+          coluna de filtros (lá ficava escondido no fim, abaixo da altura da tela) */}
+      <div role="radiogroup" aria-label="Como a IA ajuda" className="mt-2 flex flex-wrap items-center gap-x-2 px-1 text-xs">
+        <span className="text-faint">Modo da IA:</span>
+        {AI_MODE_OPTIONS.map((o, i) => {
+          const on = form.aiMode === o.value
+          return (
+            <span key={o.value} className="flex items-center gap-x-2">
+              {i > 0 && (
+                <span className="text-faint" aria-hidden="true">
+                  ·
+                </span>
+              )}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={on}
+                title={o.hint}
+                onClick={() => onChange({ ...form, aiMode: o.value })}
+                className={`underline-offset-4 transition ${
+                  on ? 'text-ink underline decoration-brand/60' : 'text-faint hover:text-muted'
+                }`}
+              >
+                {o.label}
+              </button>
+            </span>
+          )
+        })}
       </div>
       {/* Sem a coluna de filtros (tela estreita ou zoom alto), os filtros abrem por esta barra */}
       <button

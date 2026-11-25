@@ -5,7 +5,6 @@ import { PlatformPicker } from './PlatformPicker'
 import { RuntimeSlider } from './RuntimeSlider'
 import { allGenres } from '../lib/genres'
 import {
-  AI_MODE_OPTIONS,
   MEDIA_OPTIONS,
   setField,
   setGenreFilter,
@@ -69,14 +68,6 @@ export function FilterPanel({ meta, form, onChange }: Props) {
         <PlatformPicker providers={meta.providers} selected={form.providers} onToggle={toggleProvider} compact />
       </Section>
 
-      <Section title="Como a IA ajuda">
-        <OptionList
-          name="Como a IA ajuda"
-          value={form.aiMode}
-          options={AI_MODE_OPTIONS.map((o) => ({ value: o.value, label: o.label, hint: o.hint }))}
-          onChange={(v) => onChange({ ...form, aiMode: v as SearchForm['aiMode'] })}
-        />
-      </Section>
     </div>
   )
 }
