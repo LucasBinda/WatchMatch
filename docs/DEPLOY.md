@@ -24,8 +24,9 @@ Arquivos: [docker-compose.prod.yml](../docker-compose.prod.yml), [deploy/real-ip
 - **Endereço sorteado, link fixo.** O túnel rápido ganha um endereço `https://<palavras>.trycloudflare.com`,
   que muda toda vez que o container do túnel reinicia. O `deploy.sh` publica esse endereço numa página da
   branch `gh-pages`, e o GitHub Pages a serve em **https://lucasbinda.github.io/notComplete/**, que
-  redireciona para o endereço do dia. É esse link que vai para quem for avaliar. Ele ainda depende do
-  computador ligado: com o site fora do ar, o link abre uma página de erro da Cloudflare.
+  redireciona para o endereço do dia. É esse link que vai para quem for avaliar. Antes de redirecionar, a
+  página confere se o site responde: com o computador desligado, o túnel caído ou depois do `parar`, ela
+  mostra "O WatchMatch está fora do ar agora" em vez da página de erro da Cloudflare.
 - **IP real no rate limit.** Atrás do túnel, o gateway veria só o IP do cloudflared, e o site inteiro
   dividiria as 6 buscas por minuto. O `real-ip.conf` faz o Nginx usar o `CF-Connecting-IP`, que a
   Cloudflare preenche com o IP do visitante e sobrescreve se ele mandar um falso. O Nginx só aceita esse
@@ -117,8 +118,11 @@ docker stats --no-stream
 
 ### Tirar do ar e voltar ao de casa
 
+Derruba tudo, inclusive o túnel (que só existe no Compose de produção: um `docker compose down` simples não o
+derruba), e o link fixo passa a dizer que o site está fora do ar:
+
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+deploy/deploy.sh parar
 ```
 
 ```bash

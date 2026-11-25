@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 # Sobe o WatchMatch de produção com o túnel da Cloudflare e mostra o endereço público (docs/DEPLOY.md).
-# Uso, na pasta do projeto: deploy/deploy.sh
+# Uso, na pasta do projeto:
+#   deploy/deploy.sh          sobe (ou atualiza) e aponta o link fixo para o endereço novo
+#   deploy/deploy.sh parar    derruba tudo, inclusive o túnel, e o link fixo passa a dizer "fora do ar"
 # Sobe o código que está na pasta agora. Para publicar a versão da main, rode git pull antes.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-
-if [[ ! -f backend/.env ]]; then
-    echo "Falta backend/.env com as chaves do TMDB e do Groq (copie de backend/.env.example)." >&2
-    exit 1
-fi
 
 compose=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
 
@@ -29,9 +26,9 @@ publish_link() {
     tree=$(printf '100644 blob %s\tindex.html\n100644 blob %s\t.nojekyll\n' "$blob" "$nojekyll" | git mktree)
     git fetch -q origin gh-pages 2>/dev/null || true
     parent=$(git rev-parse -q --verify refs/remotes/origin/gh-pages || true)
-    commit=$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "link fixo: $url")
+    commit=$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "link fixo: ${url:-fora do ar}")
     if git push -q origin "$commit:refs/heads/gh-pages"; then
-        echo "==> Link fixo atualizado (o GitHub Pages leva 1 a 2 minutos para mostrar o novo endereço)"
+        echo "==> Link fixo atualizado (o GitHub Pages leva de 1 a 10 minutos para mostrar a mudança)"
     else
         echo "Não consegui atualizar o link fixo (git push na gh-pages falhou). O site está no ar mesmo assim." >&2
     fi
@@ -47,6 +44,19 @@ pages_url() {
         echo "https://${owner}.github.io/${repo}/"
     fi
 }
+
+if [[ "${1:-}" == "parar" ]]; then
+    echo "==> Derrubando a produção (inclusive o túnel)"
+    "${compose[@]}" down
+    # Página sem endereço: o link fixo mostra "fora do ar" em vez do endereço morto do túnel
+    publish_link ""
+    exit 0
+fi
+
+if [[ ! -f backend/.env ]]; then
+    echo "Falta backend/.env com as chaves do TMDB e do Groq (copie de backend/.env.example)." >&2
+    exit 1
+fi
 
 echo "==> Construindo e subindo (o build Maven leva alguns minutos)"
 "${compose[@]}" up -d --build --wait

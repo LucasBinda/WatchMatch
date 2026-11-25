@@ -1,12 +1,13 @@
 <!doctype html>
 <!-- Link fixo do WatchMatch (docs/DEPLOY.md). O deploy/deploy.sh preenche o endereço do túnel e a data
-     e publica esta página na branch gh-pages; o GitHub Pages a serve em https://lucasbinda.github.io/notComplete/
-     e ela manda o visitante para o endereço atual do túnel da Cloudflare, que muda a cada subida. -->
+     e publica esta página na branch gh-pages; o GitHub Pages a serve em https://lucasbinda.github.io/notComplete/.
+     Antes de redirecionar, a página confere se o site está no ar: carrega o ícone do site como imagem (imagem
+     de outro domínio não esbarra no CORS). Carregou: redireciona. Não carregou em 8 s (túnel caído, computador
+     desligado, ou "deploy/deploy.sh parar", que publica a página sem endereço): mostra que está fora do ar. -->
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="refresh" content="0; url=__URL__" />
     <meta name="robots" content="noindex" />
     <title>WatchMatch</title>
     <style>
@@ -24,16 +25,41 @@
       }
       a { color: hsl(335 80% 64%); }
       small { color: hsl(235 14% 66%); }
+      [hidden] { display: none; }
     </style>
-    <script>
-      location.replace('__URL__')
-    </script>
   </head>
   <body>
     <main>
       <h1>WatchMatch</h1>
-      <p>Abrindo o site… Se não abrir sozinho, <a href="__URL__">clique aqui</a>.</p>
-      <p><small>Endereço publicado em __QUANDO__. Se a página não carregar, o site está fora do ar no momento.</small></p>
+      <p id="checking">Abrindo o site…</p>
+      <div id="offline" hidden>
+        <p>O WatchMatch está fora do ar agora.</p>
+        <p><small>O site roda no computador da equipe e só fica no ar durante as apresentações. Tente mais tarde.</small></p>
+      </div>
+      <noscript><p>Sem JavaScript: <a href="__URL__">tente abrir o site</a>.</p></noscript>
+      <p><small>Última publicação: __QUANDO__.</small></p>
     </main>
+    <script>
+      const site = '__URL__'
+      const offline = () => {
+        document.getElementById('checking').hidden = true
+        document.getElementById('offline').hidden = false
+      }
+      if (!site.startsWith('https://')) {
+        offline()
+      } else {
+        const probe = new Image()
+        const timer = setTimeout(offline, 8000)
+        probe.onload = () => {
+          clearTimeout(timer)
+          location.replace(site)
+        }
+        probe.onerror = () => {
+          clearTimeout(timer)
+          offline()
+        }
+        probe.src = `${site}/favicon.svg?agora=${Date.now()}`
+      }
+    </script>
   </body>
 </html>
