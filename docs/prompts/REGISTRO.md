@@ -3,13 +3,6 @@
 Como ler: ver [README.md](README.md). As citações entre aspas são os pedidos como foram escritos; o resto é resumo.
 Ferramenta, quando não dito o contrário: **Claude Code** (Anthropic), trabalhando no repositório.
 
-## Primeiras fases — a completar pela equipe
-
-| Data | Fase | Commits | A completar |
-| ---- | ---- | ------- | ----------- |
-| 18/09 | Proposta e relatório inicial | `70a7d4e` | Ferramentas e pedidos usados no relatório e na ideia |
-| 28/10–31/10 | Arquitetura, contratos, catalog-service (TDD), frontend, recommendation e llm-service | `7a87fc2` a `0381c9d` | Ferramentas e pedidos usados no código e no primeiro vídeo |
-| 16/11–18/11 | Páginas de 12 a 48, modos da IA, `failed_generation`, Docker Compose, stack real nos docs | `09bacb8` a `2642fb6` | Idem |
 
 ## A partir de 18/11
 
