@@ -80,9 +80,16 @@ o GitHub Pages para essa branch (ou em Settings → Pages → Branch `gh-pages`,
 gh api -X POST repos/LucasBinda/notComplete/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'
 ```
 
-A cada subida o link passa a apontar para o endereço novo em 1 ou 2 minutos (o GitHub Pages guarda a página
-em cache por até 10 minutos). O `deploy.sh` só envia a branch `gh-pages`: não troca de branch nem mexe na
-pasta de trabalho ou na `main`. Para subir sem atualizar o link: `PUBLICAR_LINK=0 deploy/deploy.sh`.
+Cada publicação do link é um commit na `gh-pages` e um deploy do GitHub Pages, então o `deploy.sh` só publica
+quando precisa: quando o endereço do túnel mudou (o túnel foi recriado) ou quando a `deploy/link.html` mudou.
+Rodar o `deploy.sh` de novo com o túnel de pé (para atualizar o código, por exemplo) não publica nada, e o
+`parar` também não: a página confere sozinha se o site responde. Na prática, é uma publicação por sessão de
+apresentação. Quando publica, o link passa a apontar para o endereço novo em 1 a 10 minutos (build do Pages e
+cache). O `deploy.sh` só envia a branch `gh-pages`: não troca de branch nem mexe na pasta de trabalho ou na
+`main`. Para subir sem mexer no link: `PUBLICAR_LINK=0 deploy/deploy.sh`.
+
+Isso é um contorno do endereço sorteado do túnel rápido. O usual é um endereço fixo por DNS, com domínio próprio
+e túnel nomeado (seção "Endereço fixo"), em que ligar e desligar o site não publica nada.
 
 ### Enquanto estiver no ar
 
@@ -119,7 +126,7 @@ docker stats --no-stream
 ### Tirar do ar e voltar ao de casa
 
 Derruba tudo, inclusive o túnel (que só existe no Compose de produção: um `docker compose down` simples não o
-derruba), e o link fixo passa a dizer que o site está fora do ar:
+derruba). Não publica nada: o link fixo tenta abrir o site, não consegue e mostra que está fora do ar.
 
 ```bash
 deploy/deploy.sh parar

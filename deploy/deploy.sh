@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Sobe o WatchMatch de produção com o túnel da Cloudflare e mostra o endereço público (docs/DEPLOY.md).
 # Uso, na pasta do projeto:
-#   deploy/deploy.sh          sobe (ou atualiza) e aponta o link fixo para o endereço novo
-#   deploy/deploy.sh parar    derruba tudo, inclusive o túnel, e o link fixo passa a dizer "fora do ar"
+#   deploy/deploy.sh          sobe (ou atualiza) e, se o endereço do túnel mudou, aponta o link fixo para ele
+#   deploy/deploy.sh parar    derruba tudo, inclusive o túnel (o link fixo percebe sozinho que caiu)
 # Sobe o código que está na pasta agora. Para publicar a versão da main, rode git pull antes.
 set -euo pipefail
 
@@ -12,6 +12,9 @@ compose=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
 
 # Link fixo: publica deploy/link.html na branch gh-pages com o endereço do túnel. O GitHub Pages serve essa
 # página em https://<usuário>.github.io/<repositório>/ e ela redireciona para o endereço do dia.
+# Cada publicação é um commit na gh-pages e um deploy do GitHub Pages, então só publica quando precisa: quando
+# o endereço do túnel mudou ou quando a link.html mudou. Subir de novo com o túnel de pé não publica nada, e
+# derrubar também não (a página confere sozinha se o site responde e mostra "fora do ar").
 # O commit é montado direto no Git (hash-object, mktree, commit-tree): não troca de branch nem mexe na
 # pasta de trabalho ou na main. Para não publicar: PUBLICAR_LINK=0 deploy/deploy.sh
 publish_link() {
@@ -19,12 +22,22 @@ publish_link() {
     if [[ "${PUBLICAR_LINK:-1}" == "0" ]]; then
         return 0
     fi
+    # Impressão digital do que vai ao ar: o endereço + o modelo da página (sem a data)
+    local fingerprint published
+    fingerprint=$( { echo "$url"; cat deploy/link.html; } | git hash-object --stdin)
+    git fetch -q origin gh-pages 2>/dev/null || true
+    published=$(git show refs/remotes/origin/gh-pages:index.html 2>/dev/null \
+        | grep -o 'link-fixo: [0-9a-f]*' | cut -d' ' -f2 || true)
+    if [[ "$published" == "$fingerprint" ]]; then
+        echo "==> Link fixo já aponta para este endereço (nada a publicar)"
+        return 0
+    fi
     local page blob nojekyll tree parent commit
     page=$(sed -e "s#__URL__#${url}#g" -e "s#__QUANDO__#$(date '+%d/%m/%Y %H:%M')#g" deploy/link.html)
+    page="${page}"$'\n'"<!-- link-fixo: ${fingerprint} -->"
     blob=$(printf '%s\n' "$page" | git hash-object -w --stdin)
     nojekyll=$(git hash-object -w --stdin </dev/null)
     tree=$(printf '100644 blob %s\tindex.html\n100644 blob %s\t.nojekyll\n' "$blob" "$nojekyll" | git mktree)
-    git fetch -q origin gh-pages 2>/dev/null || true
     parent=$(git rev-parse -q --verify refs/remotes/origin/gh-pages || true)
     commit=$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "link fixo: ${url:-fora do ar}")
     if git push -q origin "$commit:refs/heads/gh-pages"; then
@@ -48,8 +61,7 @@ pages_url() {
 if [[ "${1:-}" == "parar" ]]; then
     echo "==> Derrubando a produção (inclusive o túnel)"
     "${compose[@]}" down
-    # Página sem endereço: o link fixo mostra "fora do ar" em vez do endereço morto do túnel
-    publish_link ""
+    # Nada a publicar: o link fixo tenta abrir o site, não consegue e mostra "fora do ar"
     exit 0
 fi
 
