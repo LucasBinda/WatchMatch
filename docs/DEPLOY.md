@@ -13,7 +13,7 @@ visitante ──HTTPS──► Cloudflare ◄──túnel── cloudflared ─�
 | Onde | O seu computador, com o Docker | Não deu para usar o Azure for Students. O Cloudflare Containers não tem plano grátis (exige o Workers Paid, de US$ 5 por mês), o Render grátis dorme depois de 15 min e não aceita tráfego da rede privada, e o Railway é pago depois de 30 dias |
 | Publicar | Túnel rápido da Cloudflare (`cloudflared`) | Grátis e sem conta. O túnel sai do computador para a Cloudflare, então não abre porta no roteador. A Cloudflare cuida do HTTPS |
 | Subir | `deploy/deploy.sh` | Faz o build, sobe tudo, mostra o endereço público e atualiza o link fixo |
-| Link fixo | GitHub Pages: **https://lucasbinda.github.io/notComplete/** | O endereço do túnel muda a cada subida; este não. É uma página que redireciona para o endereço do dia |
+| Link fixo | GitHub Pages: **https://lucasbinda.github.io/WatchMatch/** | O endereço do túnel muda a cada subida; este não. É uma página que redireciona para o endereço do dia |
 
 Arquivos: [docker-compose.prod.yml](../docker-compose.prod.yml), [deploy/real-ip.conf](../deploy/real-ip.conf),
 [deploy/deploy.sh](../deploy/deploy.sh) e [deploy/link.html](../deploy/link.html).
@@ -23,7 +23,7 @@ Arquivos: [docker-compose.prod.yml](../docker-compose.prod.yml), [deploy/real-ip
 - **Nenhuma porta aberta.** O gateway deixa de abrir a 8080. O único caminho de fora é o túnel.
 - **Endereço sorteado, link fixo.** O túnel rápido ganha um endereço `https://<palavras>.trycloudflare.com`,
   que muda toda vez que o container do túnel reinicia. O `deploy.sh` publica esse endereço numa página da
-  branch `gh-pages`, e o GitHub Pages a serve em **https://lucasbinda.github.io/notComplete/**, que
+  branch `gh-pages`, e o GitHub Pages a serve em **https://lucasbinda.github.io/WatchMatch/**, que
   redireciona para o endereço do dia. É esse link que vai para quem for avaliar. Antes de redirecionar, a
   página confere se o site responde: com o computador desligado, o túnel caído ou depois do `parar`, ela
   mostra "O WatchMatch está fora do ar agora" em vez da página de erro da Cloudflare.
@@ -80,7 +80,7 @@ Na primeira subida o `deploy.sh` cria a branch `gh-pages` com a página de redir
 o GitHub Pages para essa branch (ou em Settings → Pages → Branch `gh-pages`, pasta `/`):
 
 ```bash
-gh api -X POST repos/LucasBinda/notComplete/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'
+gh api -X POST repos/LucasBinda/WatchMatch/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'
 ```
 
 Cada publicação do link é um commit na `gh-pages` e um deploy do GitHub Pages, então o `deploy.sh` só publica

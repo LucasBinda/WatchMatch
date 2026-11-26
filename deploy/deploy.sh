@@ -47,7 +47,7 @@ publish_link() {
     fi
 }
 
-# Endereço público do GitHub Pages deste repositório (ex.: https://lucasbinda.github.io/notComplete/)
+# Endereço público do GitHub Pages deste repositório (ex.: https://lucasbinda.github.io/WatchMatch/)
 pages_url() {
     local remote owner repo
     remote=$(git remote get-url origin 2>/dev/null || true)

@@ -93,7 +93,7 @@ O `deploy.sh` faz o build, sobe tudo e, no fim, mostra o endereço público do t
 O endereço do túnel muda toda vez que ele reinicia. Para ter um link que não muda, usamos o **GitHub Pages** do
 repositório como redirecionador:
 
-**<https://lucasbinda.github.io/notComplete/>**
+**<https://lucasbinda.github.io/WatchMatch/>**
 
 - É uma página só ([deploy/link.html](../deploy/link.html)) publicada na branch `gh-pages`. Ela confere se o site
   responde e redireciona para o endereço atual do túnel; com o site desligado, mostra que está fora do ar.

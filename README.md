@@ -27,7 +27,7 @@ Sem cadastro: as plataformas escolhidas ficam salvas só no navegador. A IA nunc
 | IA | GroqCloud (modelos `gpt-oss`) com saída em JSON estruturado e prompts versionados |
 | Dados | TMDB: metadados e "onde assistir" no Brasil (dados do JustWatch) |
 | Infra | Docker Compose; gateway Nginx na frente de tudo, com rate limit por IP |
-| Deploy | Mesmo Compose, publicado com HTTPS por um túnel grátis da Cloudflare; link fixo em https://lucasbinda.github.io/notComplete/ ([docs/DEPLOY.md](docs/DEPLOY.md)) |
+| Deploy | Mesmo Compose, publicado com HTTPS por um túnel grátis da Cloudflare; link fixo em https://lucasbinda.github.io/WatchMatch/ ([docs/DEPLOY.md](docs/DEPLOY.md)) |
 
 No começo a stack era só uma previsão (Node.js ou Python, Next.js). A escolha final e os motivos
 estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
