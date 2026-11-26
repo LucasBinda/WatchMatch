@@ -35,6 +35,9 @@ Arquivos: [docker-compose.prod.yml](../docker-compose.prod.yml), [deploy/real-ip
   A JVM pode usar até 75% do teto do container.
 - **Logs giram** (3 arquivos de 10 MB por container). Os containers voltam sozinhos quando o Docker
   reinicia, a não ser que você os tenha parado.
+- **DNS fixo.** O catalog-service, o llm-service e o túnel usam o 1.1.1.1 e o 8.8.8.8. Sem isso, cada
+  container guarda o DNS da rede de quando subiu. Se o computador troca de rede, esse DNS para de
+  responder, e toda busca falha com 502 ("A IA (Groq) não respondeu"). Isso aconteceu em 25/11/2026.
 
 ## Passo a passo
 
@@ -96,6 +99,8 @@ e túnel nomeado (seção "Endereço fixo"), em que ligar e desligar o site não
 - O computador precisa ficar **ligado, conectado e sem suspender**.
 - O túnel rápido aceita até 200 pedidos ao mesmo tempo e não tem garantia de disponibilidade. Para uma
   apresentação, isso sobra.
+- Abrir `/api/recommend` direto no navegador dá **403**, e isso é esperado: a busca só aceita POST, e o
+  site faz esse POST sozinho. Para testar, use a página.
 
 ### Achar o endereço de novo
 

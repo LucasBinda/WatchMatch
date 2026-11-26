@@ -15,6 +15,13 @@ x-logging: &logging
     max-size: 10m
     max-file: "3"
 
+# DNS públicos fixos para quem sai para a internet (TMDB, Groq, Cloudflare). Sem isso, o container guarda
+# o DNS da rede de quando subiu: se o computador trocar de rede (outro Wi-Fi, o roteador reiniciou), esse DNS
+# para de responder e as buscas falham com 502 até reiniciar os containers.
+x-dns: &dns
+  - 1.1.1.1
+  - 8.8.8.8
+
 # A JVM usa até 75% do teto do container (o padrão seria só 25%)
 x-java: &java
   JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
@@ -23,6 +30,7 @@ services:
   catalog-service:
     environment:
       <<: *java
+    dns: *dns
     mem_limit: 640m
     logging: *logging
     restart: unless-stopped
@@ -30,6 +38,7 @@ services:
   llm-service:
     environment:
       <<: *java
+    dns: *dns
     mem_limit: 512m
     logging: *logging
     restart: unless-stopped
@@ -62,6 +71,7 @@ services:
     depends_on:
       gateway:
         condition: service_healthy
+    dns: *dns
     mem_limit: 64m
     logging: *logging
     restart: unless-stopped
