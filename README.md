@@ -1,4 +1,4 @@
-# WatchMatch (`notComplete`)
+# WatchMatch
 
 Aplicação web de **recomendação de filmes e séries** com filtros + intenção em linguagem natural (LLM via Groq api), considerando as plataformas disponíveis para o usuário (ex.: Netflix, Amazon Prime Video).
 
